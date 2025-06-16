@@ -1,0 +1,12 @@
+# Dependências principais para controle DMX512
+pyserial>=3.5
+
+# Utilitários
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Interface gráfica (incluído no Python padrão)
+# tkinter  # Incluído no Python padrão
+# Alternativas para GUI mais avançada:
+# PyQt5>=5.15.0
+# PySide2>=5.15.0
