@@ -1,5 +1,7 @@
 # Dependências principais para controle DMX512
 pyserial>=3.5
+# Adicione outras dependências aqui
+coloredlogs>=15.0
 
 # Utilitários
 numpy>=1.21.0

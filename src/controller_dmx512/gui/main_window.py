@@ -38,13 +38,16 @@ class MainWindow:
         self.setup_window()
         self.create_widgets()
         self.setup_bindings()
+        self.update_fixtures_list()
 
         logger.info("Janela principal inicializada")
 
     def setup_window(self):
         """Configura a janela principal"""
         self.root.title("Controlador DMX512")
-        self.root.geometry("1200x800")
+        # Abre em maximizado
+        self.root.state("zoomed")
+        # self.root.geometry("1920x1080")
         self.root.minsize(800, 600)
 
         # Configura ícone (se disponível)
@@ -68,6 +71,8 @@ class MainWindow:
 
         # Frame de conteúdo principal
         content_frame = ttk.Frame(main_frame)
+        # Ajusta o tamanho do frame para 1/2 da largura da janela
+        # content_frame.geometry("1200x600")
         content_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
         # Painel esquerdo - Lista de fixtures
@@ -196,6 +201,9 @@ class MainWindow:
         """Cria o painel do universo DMX"""
         # Frame do painel
         universe_frame = ttk.LabelFrame(parent, text="Universo DMX")
+        # Ajusta o tamanho do frame para 1/2 da largura da janela
+        # universe_frame.pack_propagate(False)
+        universe_frame.configure(width=800)
         universe_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(5, 0))
 
         # Widget do universo
@@ -429,6 +437,9 @@ class MainWindow:
         for fixture in self.controller.get_all_fixtures():
             self.fixtures_listbox.insert(tk.END, fixture.name)
 
+        # Oculta label inicial
+        self.no_fixture_label.pack_forget()
+
     def on_fixture_select(self, event):
         """Callback para seleção de fixture"""
         selection = self.fixtures_listbox.curselection()
@@ -485,6 +496,8 @@ class MainWindow:
         self.universe_status.config(
             text=f"Universo: {status['universe_used']}/512 canais ativos"
         )
+
+        self.universe_widget.update_display()
 
         # Agenda próxima atualização
         self.root.after(1000, self.update_status)

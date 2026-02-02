@@ -1,4 +1,4 @@
-# Controlador DMX512
+pre# Controlador DMX512
 
 Um controlador completo para equipamentos que suportam o protocolo DMX512 escrito em Python, projetado para controle de iluminação profissional via porta RS485.
 

@@ -81,8 +81,8 @@ class UniverseWidget(ttk.Frame):
     def create_channel_buttons(self):
         """Cria botões para os 512 canais"""
         # Organiza em grade de 32x16 (512 canais)
-        rows = 16
-        cols = 32
+        rows = 32
+        cols = 13
 
         for i in range(512):
             channel_num = i + 1
@@ -98,7 +98,7 @@ class UniverseWidget(ttk.Frame):
                 channel_frame,
                 text=str(channel_num),
                 width=3,
-                height=1,
+                height=2,
                 font=("Arial", 8),
                 command=lambda ch=channel_num: self.on_channel_click(ch),
             )

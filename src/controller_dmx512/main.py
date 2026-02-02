@@ -11,6 +11,8 @@ import logging
 import sys
 from pathlib import Path
 
+import coloredlogs
+
 from controller_dmx512.core.dmx_controller import DMXController
 from controller_dmx512.gui.main_window import MainWindow
 
@@ -34,24 +36,25 @@ def setup_logging(level: str = "INFO", log_file: str = None):
     if not isinstance(numeric_level, int):
         raise ValueError(f"Nível de log inválido: {level}")
 
-    # Configura handlers
-    handlers = []
+    # Instala o coloredlogs
+    coloredlogs.install(
+        level=numeric_level,
+        fmt=log_format,
+        level_styles={
+            'debug': {'color': 'green'},
+            'info': {'color': 'cyan'},
+            'warning': {'color': 'yellow'},
+            'error': {'color': 'red'},
+            'critical': {'color': 'red', 'bold': True}
+        }
+    )
 
-    # Handler para console
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(numeric_level)
-    console_handler.setFormatter(logging.Formatter(log_format))
-    handlers.append(console_handler)
-
-    # Handler para arquivo (se especificado)
+    # Handler para arquivo (se especificado) - não será colorido
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(logging.Formatter(log_format))
-        handlers.append(file_handler)
-
-    # Configura logging root
-    logging.basicConfig(level=numeric_level, format=log_format, handlers=handlers)
+        logging.getLogger().addHandler(file_handler)
 
     # Configura logging específico para bibliotecas externas
     logging.getLogger("serial").setLevel(logging.WARNING)

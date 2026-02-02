@@ -82,8 +82,7 @@ class DMXProtocol:
             )
 
             # Configura a porta para suportar break
-            if hasattr(self.serial_connection, "setBreak"):
-                self.serial_connection.setBreak(False)
+            self.serial_connection.break_condition = False
 
             self.is_connected = True
             logger.info(f"Conectado à porta {self.port} com sucesso")
@@ -153,12 +152,12 @@ class DMXProtocol:
         """
         try:
             # 1. Break (sinal baixo)
-            self.serial_connection.setBreak(True)
+            self.serial_connection.break_condition = True
             # Converte μs para segundos
             time.sleep(self.break_length.value / 1000000.0)
 
             # 2. Mark After Break (sinal alto)
-            self.serial_connection.setBreak(False)
+            self.serial_connection.break_condition = False
             time.sleep(self.MARK_AFTER_BREAK / 1000000.0)
 
             # 3. Start Code
