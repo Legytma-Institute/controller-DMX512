@@ -31,4 +31,4 @@ sudo udevadm trigger
 
 echo "Configuração de portas seriais concluída!"
 echo "Dispositivos disponíveis:"
-ls -la /dev/ttyS* 2>/dev/null || echo "Nenhum dispositivo serial encontrado"
+ls -la /dev/ttyUSB* 2>/dev/null || ls -la /dev/ttyACM* 2>/dev/null || ls -la /dev/ttyS* 2>/dev/null || echo "Nenhum dispositivo serial encontrado"

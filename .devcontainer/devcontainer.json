@@ -55,7 +55,8 @@
   // Serial port access configuration
   "runArgs": [
     "--privileged",
-    "-v /dev:/dev",
+    "-v",
+    "/dev:/dev",
     "--cap-add=SYS_RAWIO"
   ],
 
