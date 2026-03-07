@@ -31,8 +31,4 @@ sudo udevadm trigger
 
 echo "Configuração de portas seriais concluída!"
 echo "Dispositivos disponíveis:"
-ls -la /dev/tty* 2>/dev/null || echo "Nenhum dispositivo serial encontrado"
-
-curl -L -o ola.tar.gz https://github.com/OpenLightingProject/ola/releases/download/0.10.9/ola-0.10.9.tar.gz
-
-tar -xvzf ola.tar.gz
+ls -la /dev/ttyS* 2>/dev/null || echo "Nenhum dispositivo serial encontrado"
