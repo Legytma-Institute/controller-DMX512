@@ -8,6 +8,7 @@ da aplicação de controle de iluminação DMX512.
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -121,7 +122,8 @@ Exemplos de uso:
         help="Nível de logging (padrão: INFO)",
     )
 
-    parser.add_argument("--log-file", type=str, help="Arquivo para salvar logs")
+    parser.add_argument("--log-file", type=str,
+                        help="Arquivo para salvar logs")
 
     parser.add_argument(
         "--no-gui",
@@ -141,6 +143,12 @@ Exemplos de uso:
 
     # Parse argumentos
     args = parser.parse_args()
+
+    # Fallback automático para modo console em ambientes sem DISPLAY
+    if not args.no_gui and not os.environ.get("DISPLAY"):
+        logging.warning(
+            "DISPLAY não definido; alternando para modo console (--no-gui)")
+        args.no_gui = True
 
     try:
         # Configura logging

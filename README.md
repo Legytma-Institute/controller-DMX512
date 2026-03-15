@@ -245,6 +245,30 @@ pytest tests/unit/test_channel.py -v
 
 ## 🔧 Configuração de Hardware
 
+### Acesso à porta serial no Dev Container
+
+Este projeto já vem preparado para expor adaptadores RS485/DMX512 no devcontainer (bind de `/dev` e modo privilegiado). Passos rápidos:
+
+- **Devcontainer**: após build, o `.devcontainer/post-create.sh` cria/usa o grupo `dialout`, instala utilitários (`minicom`, `screen`, `setserial`, `udev`) e roda `scripts/setup-serial.sh` (regras udev são opcionais; em container sem udevd o script apenas avisa e segue).
+- **Verificar dispositivos**: `ls -la /dev/ttyUSB* /dev/ttyACM* /dev/ttyS*` dentro do container.
+- **Testar comunicação**: `minicom -D /dev/ttyUSB0` ou `screen /dev/ttyUSB0 9600`. Em Python: `serial.Serial('/dev/ttyUSB0', 250000, timeout=1)`.
+
+#### Windows (WSL 2 + Docker Desktop)
+
+- Instale/ative WSL 2 e o `usbipd-win`.
+- Encaminhe o adaptador sempre que conectar: `usbipd list` → `usbipd bind --busid <id>` (1ª vez) → `usbipd attach --wsl --busid <id>`.
+- Script de apoio: `scripts/setup-usbipd.ps1` (PowerShell) automatiza bind/attach.
+
+#### macOS
+
+- Instale driver do adaptador (FTDI/CH34x) se preciso.
+- Se necessário, crie um pseudo-device com `socat` e faça bind no `devcontainer.json` (ex.: `${HOME}/ttyDMX` → `/dev/ttyUSB0`).
+
+#### Linux
+
+- Adicione seu usuário a `dialout,plugdev`: `sudo usermod -aG dialout,plugdev $USER` e abra nova sessão (`newgrp dialout`).
+- Opcional: regra udev específica por VID/PID para liberar a porta.
+
 ### Adaptador USB-RS485
 
 1. **Conecte o adaptador** USB-RS485 ao computador
@@ -307,12 +331,14 @@ save_fixture_config(fixtures, "setup.json")
 ### Problemas Comuns
 
 1. **Porta não encontrada**
+
    ```bash
    # Listar portas disponíveis
    python -c "import serial.tools.list_ports; print([p.device for p in serial.tools.list_ports.comports()])"
    ```
 
 2. **Erro de permissão (Linux)**
+
    ```bash
    # Adicionar usuário ao grupo dialout
    sudo usermod -a -G dialout $USER
@@ -320,6 +346,7 @@ save_fixture_config(fixtures, "setup.json")
    ```
 
 3. **Interface gráfica não abre**
+
    ```bash
    # Verificar tkinter
    python -c "import tkinter; tkinter._test()"

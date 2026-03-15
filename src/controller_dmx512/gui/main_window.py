@@ -6,6 +6,7 @@ controles para gerenciar fixtures e canais DMX.
 """
 
 import logging
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
@@ -46,7 +47,15 @@ class MainWindow:
         """Configura a janela principal"""
         self.root.title("Controlador DMX512")
         # Abre em maximizado
-        self.root.state("zoomed")
+        try:
+            if sys.platform.startswith("win"):
+                self.root.state("zoomed")
+            else:
+                self.root.attributes("-zoomed", True)
+        except tk.TclError:
+            self.root.geometry(
+                f"{self.root.winfo_screenwidth()}x{self.root.winfo_screenheight()}+0+0"
+            )
         # self.root.geometry("1920x1080")
         self.root.minsize(800, 600)
 
@@ -140,7 +149,8 @@ class MainWindow:
         # Porta serial
         ttk.Label(toolbar, text="Porta:").pack(side=tk.LEFT, padx=(0, 5))
         self.port_var = tk.StringVar()
-        self.port_combo = ttk.Combobox(toolbar, textvariable=self.port_var, width=15)
+        self.port_combo = ttk.Combobox(
+            toolbar, textvariable=self.port_var, width=15)
         self.port_combo.pack(side=tk.LEFT, padx=(0, 5))
 
         # Atualiza lista de portas
@@ -150,7 +160,8 @@ class MainWindow:
         """Cria o painel de lista de fixtures"""
         # Frame do painel
         fixtures_frame = ttk.LabelFrame(parent, text="Fixtures")
-        fixtures_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 5))
+        fixtures_frame.pack(side=tk.LEFT, fill=tk.BOTH,
+                            expand=False, padx=(0, 5))
 
         # Lista de fixtures
         list_frame = ttk.Frame(fixtures_frame)
@@ -161,7 +172,8 @@ class MainWindow:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Listbox
-        self.fixtures_listbox = tk.Listbox(list_frame, yscrollcommand=scrollbar.set)
+        self.fixtures_listbox = tk.Listbox(
+            list_frame, yscrollcommand=scrollbar.set)
         self.fixtures_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.fixtures_listbox.yview)
 
@@ -184,7 +196,8 @@ class MainWindow:
 
         # Frame para widgets de fixture
         self.fixture_widgets_frame = ttk.Frame(controls_frame)
-        self.fixture_widgets_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.fixture_widgets_frame.pack(
+            fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Label inicial
         self.no_fixture_label = ttk.Label(
@@ -204,7 +217,8 @@ class MainWindow:
         # Ajusta o tamanho do frame para 1/2 da largura da janela
         # universe_frame.pack_propagate(False)
         universe_frame.configure(width=800)
-        universe_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=False, padx=(5, 0))
+        universe_frame.pack(side=tk.RIGHT, fill=tk.BOTH,
+                            expand=False, padx=(5, 0))
 
         # Widget do universo
         self.universe_widget = UniverseWidget(universe_frame, self.controller)
@@ -216,7 +230,8 @@ class MainWindow:
         self.status_bar.pack(fill=tk.X, pady=(10, 0))
 
         # Status de conexão
-        self.connection_status = ttk.Label(self.status_bar, text="Desconectado")
+        self.connection_status = ttk.Label(
+            self.status_bar, text="Desconectado")
         self.connection_status.pack(side=tk.LEFT)
 
         # Status do universo
@@ -364,7 +379,8 @@ class MainWindow:
         """Remove fixture selecionado"""
         selection = self.fixtures_listbox.curselection()
         if not selection:
-            messagebox.showwarning("Aviso", "Selecione um fixture para remover")
+            messagebox.showwarning(
+                "Aviso", "Selecione um fixture para remover")
             return
 
         fixture_name = self.fixtures_listbox.get(selection[0])
@@ -372,7 +388,8 @@ class MainWindow:
             if self.controller.remove_fixture(fixture_name):
                 self.update_fixtures_list()
                 self.clear_fixture_controls()
-                messagebox.showinfo("Sucesso", f"Fixture '{fixture_name}' removido")
+                messagebox.showinfo(
+                    "Sucesso", f"Fixture '{fixture_name}' removido")
             else:
                 messagebox.showerror("Erro", "Falha ao remover fixture")
 
@@ -380,7 +397,8 @@ class MainWindow:
         """Renomeia fixture selecionado"""
         selection = self.fixtures_listbox.curselection()
         if not selection:
-            messagebox.showwarning("Aviso", "Selecione um fixture para renomear")
+            messagebox.showwarning(
+                "Aviso", "Selecione um fixture para renomear")
             return
 
         old_name = self.fixtures_listbox.get(selection[0])
@@ -417,7 +435,8 @@ class MainWindow:
 
             self.update_fixtures_list()
             dialog.destroy()
-            messagebox.showinfo("Sucesso", f"Fixture renomeado para '{new_name}'")
+            messagebox.showinfo(
+                "Sucesso", f"Fixture renomeado para '{new_name}'")
 
         buttons_frame = ttk.Frame(dialog)
         buttons_frame.pack(pady=10)

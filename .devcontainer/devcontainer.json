@@ -29,7 +29,7 @@
   // "forwardPorts": [],
 
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "chmod +x .devcontainer/setup-serial.sh && .devcontainer/setup-serial.sh",
+  "postCreateCommand": "chmod +x .devcontainer/post-create.sh && .devcontainer/post-create.sh",
 
   // Configure tool-specific properties.
   "customizations": {
@@ -57,8 +57,12 @@
     "--privileged",
     "-v",
     "/dev:/dev",
-    "--cap-add=SYS_RAWIO"
+    "--cap-add=SYS_RAWIO",
+    "-e",
+    "DISPLAY=${localEnv:DISPLAY:-:0}"
   ],
+
+  "mounts": ["type=bind,source=/tmp/.X11-unix,target=/tmp/.X11-unix,readonly"],
 
   "updateRemoteUserUID": true,
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
