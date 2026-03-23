@@ -197,6 +197,38 @@ class Channel:
             "history_size": len(self.value_history),
         }
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializa o canal para dicionário"""
+        return {
+            "name": self.name,
+            "type": self.channel_type.value,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "default_value": self.default_value,
+            "current_value": self.current_value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], number: int) -> "Channel":
+        """Cria um canal a partir de um dicionário
+
+        Args:
+            data: Dicionário com dados do canal
+            number: Número (endereço) do canal
+        """
+        channel_type = ChannelType(data.get("type", "custom"))
+        ch = cls(
+            number=number,
+            name=data.get("name", f"Canal {number}"),
+            channel_type=channel_type,
+            min_value=data.get("min_value", 0),
+            max_value=data.get("max_value", 255),
+            default_value=data.get("default_value", 0),
+        )
+        if "current_value" in data:
+            ch.set_value(data["current_value"])
+        return ch
+
     def __str__(self) -> str:
         return f"Channel({self.number}: {self.name}, value={self.current_value})"
 

@@ -1,0 +1,12 @@
+{
+  "name": "LED Strip RGB",
+  "manufacturer": "Generic",
+  "brand": "Generic",
+  "model": "LEDSTRIP-RGB-3",
+  "type": "led_strip",
+  "channels": [
+    {"name": "Red 1", "type": "red"},
+    {"name": "Green 1", "type": "green"},
+    {"name": "Blue 1", "type": "blue"}
+  ]
+}

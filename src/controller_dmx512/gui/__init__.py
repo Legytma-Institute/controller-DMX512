@@ -8,6 +8,7 @@ do controlador de iluminação.
 from .channel_widget import ChannelWidget
 from .fixture_widget import FixtureWidget
 from .main_window import MainWindow
+from .rdm_widget import RDMWidget
 from .universe_widget import UniverseWidget
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "FixtureWidget",
     "ChannelWidget",
     "UniverseWidget",
+    "RDMWidget",
 ]

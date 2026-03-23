@@ -5,9 +5,11 @@ Este módulo define as classes Fixture e FixtureType que representam
 dispositivos de iluminação e seus tipos.
 """
 
+import json
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 from .channel import Channel, ChannelType
 
@@ -99,6 +101,17 @@ class Fixture:
 
         self.channels.append(channel)
         logger.debug(f"Canal {channel.number} adicionado ao fixture '{self.name}'")
+
+    def remove_channel_by_index(self, index: int) -> bool:
+        """Remove um canal pelo índice e reajusta endereços dos canais seguintes"""
+        if 0 <= index < len(self.channels):
+            removed = self.channels.pop(index)
+            # Reajusta endereços dos canais restantes
+            for i, ch in enumerate(self.channels):
+                ch.number = self.start_address + i
+            logger.debug(f"Canal '{removed.name}' removido do fixture '{self.name}'")
+            return True
+        return False
 
     def get_channel(self, channel_number: int) -> Optional[Channel]:
         """
@@ -249,6 +262,119 @@ class Fixture:
             "channels": [channel.get_info() for channel in self.channels],
         }
 
+    def to_config(self) -> Dict[str, Any]:
+        """Exporta o fixture como template de configuração (.dmxfix)"""
+        metadata = getattr(self, "config_metadata", {})
+        return {
+            "name": metadata.get("fixture_name", self.name),
+            "manufacturer": metadata.get("manufacturer", ""),
+            "brand": metadata.get("brand", ""),
+            "model": metadata.get("model", ""),
+            "type": self.fixture_type.value,
+            "channels": [
+                {"name": ch.name, "type": ch.channel_type.value}
+                for ch in self.channels
+            ],
+        }
+
+    def save_config(self, filepath: Union[str, Path]) -> None:
+        """Salva o fixture como arquivo de configuração (template .dmxfix)"""
+        path = Path(filepath)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.to_config(), f, indent=2, ensure_ascii=False)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serializa o fixture para dicionário (usado para salvar coleção)"""
+        return {
+            "name": self.name,
+            "type": self.fixture_type.value,
+            "start_address": self.start_address,
+            "is_active": self.is_active,
+            "channels": [ch.to_dict() for ch in self.channels],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Fixture":
+        """Cria um fixture a partir de um dicionário serializado"""
+        fixture_type = FixtureType(data.get("type", "custom"))
+        start_address = data["start_address"]
+        channels: List[Channel] = []
+        for i, ch_data in enumerate(data.get("channels", [])):
+            channels.append(Channel.from_dict(ch_data, start_address + i))
+        fixture = cls(
+            name=data["name"],
+            fixture_type=fixture_type,
+            start_address=start_address,
+            channels=channels,
+        )
+        fixture.is_active = data.get("is_active", True)
+        return fixture
+
+    @classmethod
+    def from_config(cls, config_path: Union[str, Path], name: str, start_address: int) -> "Fixture":
+        """Cria um fixture a partir de um arquivo de configuração (template)
+
+        Args:
+            config_path: Caminho para o arquivo JSON de configuração
+            name: Nome para o fixture
+            start_address: Endereço DMX inicial
+        """
+        path = Path(config_path)
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        fixture_type_str = cfg.get("type", "custom")
+        try:
+            fixture_type = FixtureType(fixture_type_str)
+        except ValueError:
+            fixture_type = FixtureType.CUSTOM
+
+        channels: List[Channel] = []
+        for i, ch_cfg in enumerate(cfg.get("channels", [])):
+            ch = Channel(
+                number=start_address + i,
+                name=ch_cfg.get("name", f"Canal {i + 1}"),
+                channel_type=ChannelType(ch_cfg.get("type", "custom")),
+                min_value=ch_cfg.get("min_value", 0),
+                max_value=ch_cfg.get("max_value", 255),
+                default_value=ch_cfg.get("default_value", 0),
+            )
+            channels.append(ch)
+
+        fixture = cls(
+            name=name,
+            fixture_type=fixture_type,
+            start_address=start_address,
+            channels=channels,
+        )
+        fixture.config_metadata = {
+            "fixture_name": cfg.get("name", ""),
+            "manufacturer": cfg.get("manufacturer", ""),
+            "brand": cfg.get("brand", ""),
+            "model": cfg.get("model", ""),
+        }
+        return fixture
+
+    def clone(self, new_name: str, new_start_address: int) -> "Fixture":
+        """Clona o fixture com novo nome e endereço"""
+        channels: List[Channel] = []
+        for i, ch in enumerate(self.channels):
+            new_ch = Channel(
+                number=new_start_address + i,
+                name=ch.name,
+                channel_type=ch.channel_type,
+                min_value=ch.min_value,
+                max_value=ch.max_value,
+                default_value=ch.default_value,
+            )
+            channels.append(new_ch)
+        return Fixture(
+            name=new_name,
+            fixture_type=self.fixture_type,
+            start_address=new_start_address,
+            channels=channels,
+        )
+
     def __str__(self) -> str:
         return f"Fixture('{self.name}', type={self.fixture_type.value}, channels={len(self.channels)})"
 
@@ -305,5 +431,17 @@ class PredefinedFixtures:
                 Channel(base_addr + 1, f"Green {i+1}", ChannelType.GREEN)
             )
             fixture.add_channel(Channel(base_addr + 2, f"Blue {i+1}", ChannelType.BLUE))
+
+        return fixture
+
+    @staticmethod
+    def create_generic(name: str, start_address: int, channel_count: int = 16) -> Fixture:
+        """Cria uma fixture genérica com N canais (padrão 16) para testes"""
+        fixture = Fixture(name, FixtureType.CUSTOM, start_address)
+
+        for i in range(channel_count):
+            fixture.add_channel(
+                Channel(start_address + i, f"Canal {i + 1}", ChannelType.DIMMER)
+            )
 
         return fixture

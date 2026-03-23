@@ -11,6 +11,7 @@ from .channel import Channel
 from .dmx_controller import DMXController
 from .fixture import Fixture, FixtureType
 from .protocol import DMXProtocol
+from .rdm import RDMDeviceInfo, RDMUID
 
 __all__ = [
     "DMXController",
@@ -18,4 +19,6 @@ __all__ = [
     "FixtureType",
     "Channel",
     "DMXProtocol",
+    "RDMUID",
+    "RDMDeviceInfo",
 ]

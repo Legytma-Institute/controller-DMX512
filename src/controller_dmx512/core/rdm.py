@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 RDM_START_CODE = 0xCC
@@ -97,9 +97,38 @@ class DiscoveryResult(Enum):
     COLLISION = "collision"
 
 
+# --- Discovery PIDs ---
 PID_DISC_UNIQUE_BRANCH = 0x0001
 PID_DISC_MUTE = 0x0002
 PID_DISC_UN_MUTE = 0x0003
+
+# --- Required PIDs (ANSI E1.20 §10) ---
+PID_SUPPORTED_PARAMETERS = 0x0050
+PID_DEVICE_INFO = 0x0060
+PID_DEVICE_MODEL_DESCRIPTION = 0x0080
+PID_MANUFACTURER_LABEL = 0x0081
+PID_DEVICE_LABEL = 0x0082
+PID_SOFTWARE_VERSION_LABEL = 0x00C0
+PID_DMX_PERSONALITY = 0x00E0
+PID_DMX_PERSONALITY_DESCRIPTION = 0x00E1
+PID_DMX_START_ADDRESS = 0x00F0
+PID_SENSOR_DEFINITION = 0x0200
+PID_SENSOR_VALUE = 0x0201
+PID_IDENTIFY_DEVICE = 0x1000
+
+
+class RDMNackReason(int, Enum):
+    UNKNOWN_PID = 0x0000
+    FORMAT_ERROR = 0x0001
+    HARDWARE_FAULT = 0x0002
+    PROXY_REJECT = 0x0003
+    WRITE_PROTECT = 0x0004
+    UNSUPPORTED_COMMAND_CLASS = 0x0005
+    DATA_OUT_OF_RANGE = 0x0006
+    BUFFER_FULL = 0x0007
+    PACKET_SIZE_UNSUPPORTED = 0x0008
+    SUB_DEVICE_OUT_OF_RANGE = 0x0009
+    PROXY_BUFFER_FULL = 0x000A
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,3 +259,58 @@ def decode_discovery_response(raw: bytes) -> Tuple[DiscoveryResult, Optional[RDM
 
     uid = RDMUID(uid_bytes[0] << 8 | uid_bytes[1], (uid_bytes[2] << 24) | (uid_bytes[3] << 16) | (uid_bytes[4] << 8) | uid_bytes[5])
     return (DiscoveryResult.VALID, uid)
+
+
+@dataclass
+class RDMPersonality:
+    index: int
+    dmx_footprint: int
+    description: str = ""
+
+
+@dataclass
+class RDMDeviceInfo:
+    uid: RDMUID
+    rdm_protocol_version: int = 0x0100
+    device_model_id: int = 0
+    product_category: int = 0
+    software_version_id: int = 0
+    dmx_footprint: int = 0
+    current_personality: int = 1
+    personality_count: int = 1
+    dmx_start_address: int = 1
+    sub_device_count: int = 0
+    sensor_count: int = 0
+    manufacturer_label: str = ""
+    device_model_description: str = ""
+    device_label: str = ""
+    software_version_label: str = ""
+    supported_parameters: List[int] = field(default_factory=list)
+    personalities: Dict[int, RDMPersonality] = field(default_factory=dict)
+    identifying: bool = False
+
+
+def parse_device_info_response(uid: RDMUID, data: bytes) -> RDMDeviceInfo:
+    if len(data) < 19:
+        raise ValueError("DEVICE_INFO response too short")
+    info = RDMDeviceInfo(uid=uid)
+    info.rdm_protocol_version = (data[0] << 8) | data[1]
+    info.device_model_id = (data[2] << 8) | data[3]
+    info.product_category = (data[4] << 8) | data[5]
+    info.software_version_id = (
+        (data[6] << 24) | (data[7] << 16) | (data[8] << 8) | data[9]
+    )
+    info.dmx_footprint = (data[10] << 8) | data[11]
+    info.current_personality = data[12]
+    info.personality_count = data[13]
+    info.dmx_start_address = (data[14] << 8) | data[15]
+    info.sub_device_count = (data[16] << 8) | data[17]
+    info.sensor_count = data[18]
+    return info
+
+
+def parse_supported_parameters_response(data: bytes) -> List[int]:
+    pids: List[int] = []
+    for i in range(0, len(data) - 1, 2):
+        pids.append((data[i] << 8) | data[i + 1])
+    return pids

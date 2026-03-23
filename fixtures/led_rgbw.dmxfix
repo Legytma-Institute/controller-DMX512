@@ -1,0 +1,25 @@
+{
+  "name": "LED RGBW",
+  "manufacturer": "Generic",
+  "brand": "Generic",
+  "model": "RGBW",
+  "type": "par_can",
+  "channels": [
+    {
+      "name": "Red",
+      "type": "red"
+    },
+    {
+      "name": "Green",
+      "type": "green"
+    },
+    {
+      "name": "Blue",
+      "type": "blue"
+    },
+    {
+      "name": "White",
+      "type": "white"
+    }
+  ]
+}

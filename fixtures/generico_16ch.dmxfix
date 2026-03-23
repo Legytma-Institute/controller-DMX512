@@ -1,0 +1,25 @@
+{
+  "name": "Genérico 16ch",
+  "manufacturer": "Generic",
+  "brand": "Generic",
+  "model": "GEN-16CH",
+  "type": "custom",
+  "channels": [
+    {"name": "Canal 1", "type": "dimmer"},
+    {"name": "Canal 2", "type": "dimmer"},
+    {"name": "Canal 3", "type": "dimmer"},
+    {"name": "Canal 4", "type": "dimmer"},
+    {"name": "Canal 5", "type": "dimmer"},
+    {"name": "Canal 6", "type": "dimmer"},
+    {"name": "Canal 7", "type": "dimmer"},
+    {"name": "Canal 8", "type": "dimmer"},
+    {"name": "Canal 9", "type": "dimmer"},
+    {"name": "Canal 10", "type": "dimmer"},
+    {"name": "Canal 11", "type": "dimmer"},
+    {"name": "Canal 12", "type": "dimmer"},
+    {"name": "Canal 13", "type": "dimmer"},
+    {"name": "Canal 14", "type": "dimmer"},
+    {"name": "Canal 15", "type": "dimmer"},
+    {"name": "Canal 16", "type": "dimmer"}
+  ]
+}

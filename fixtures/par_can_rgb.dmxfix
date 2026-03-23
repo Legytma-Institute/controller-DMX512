@@ -1,0 +1,12 @@
+{
+  "name": "PAR Can RGB",
+  "manufacturer": "Generic",
+  "brand": "Generic",
+  "model": "PAR64-RGB",
+  "type": "par_can",
+  "channels": [
+    {"name": "Red", "type": "red"},
+    {"name": "Green", "type": "green"},
+    {"name": "Blue", "type": "blue"}
+  ]
+}

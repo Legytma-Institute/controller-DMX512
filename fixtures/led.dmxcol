@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "name": "PAR Can RGBW",
+      "type": "par_can",
+      "start_address": 1,
+      "is_active": true,
+      "channels": [
+        {
+          "name": "Red",
+          "type": "red",
+          "min_value": 0,
+          "max_value": 255,
+          "default_value": 0,
+          "current_value": 0
+        },
+        {
+          "name": "Green",
+          "type": "green",
+          "min_value": 0,
+          "max_value": 255,
+          "default_value": 0,
+          "current_value": 0
+        },
+        {
+          "name": "Blue",
+          "type": "blue",
+          "min_value": 0,
+          "max_value": 255,
+          "default_value": 0,
+          "current_value": 0
+        },
+        {
+          "name": "White",
+          "type": "white",
+          "min_value": 0,
+          "max_value": 255,
+          "default_value": 0,
+          "current_value": 0
+        }
+      ]
+    }
+  ]
+}

@@ -52,6 +52,7 @@ TEST=false
 LINT=false
 BUILD=false
 RUN=false
+DEBUG=false
 
 if [ $# -eq 0 ]; then
     HELP=true
@@ -120,6 +121,12 @@ while [[ $# -gt 0 ]]; do
             shift 1
             ;;
         --run)
+            RUN=true
+            ARGUMENT_CONTEXT="run"
+            shift 1
+            ;;
+        --debug)
+            DEBUG=true
             RUN=true
             ARGUMENT_CONTEXT="run"
             shift 1
@@ -221,6 +228,16 @@ fi
 
 if [ "${RUN}" == "true" ]; then
     echo -e "\033[33mRunning app...\033[0m" >&2
+
+    if [ "${DEBUG}" == "true" ]; then
+        if "${VENV_PY}" -m controller_dmx512.main "${RUN_ARGUMENTS[@]}"; then
+            echo -e "\033[32mRun succeeded!\033[0m" >&2
+            exit 0
+        else
+            echo -e "\033[31mRun failed!\033[0m" >&2
+            exit 6
+        fi
+    fi
 
     ensure_dev_dependencies
 

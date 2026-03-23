@@ -51,3 +51,5 @@ KERNEL=="ttyS[0-9]*", MODE="0666", GROUP="dialout"
 EOF
 
 "${SCRIPT_DIR}/setup-serial.sh"
+
+docker restart $(hostname)

@@ -6,14 +6,17 @@ controles para gerenciar fixtures e canais DMX.
 """
 
 import logging
+import os
 import sys
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Optional
 
 from ..core.dmx_controller import DMXController
 from ..core.fixture import Fixture, FixtureType, PredefinedFixtures
 from .fixture_widget import FixtureWidget
+from .rdm_widget import RDMWidget
 from .universe_widget import UniverseWidget
 
 logger = logging.getLogger(__name__)
@@ -35,8 +38,11 @@ class MainWindow:
             controller: Instância do controlador DMX (se None, cria uma nova)
         """
         self.controller = controller or DMXController()
+        self._current_file: Optional[str] = None
+        self._displayed_fixture: Optional[str] = None
         self.root = tk.Tk()
         self.setup_window()
+        self.create_menu_bar()
         self.create_widgets()
         self.setup_bindings()
         self.update_fixtures_list()
@@ -78,11 +84,17 @@ class MainWindow:
         # Barra de ferramentas superior
         self.create_toolbar(main_frame)
 
+        # Notebook com abas (DMX / RDM)
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+
+        # --- Aba DMX ---
+        dmx_tab = ttk.Frame(self.notebook)
+        self.notebook.add(dmx_tab, text="DMX")
+
         # Frame de conteúdo principal
-        content_frame = ttk.Frame(main_frame)
-        # Ajusta o tamanho do frame para 1/2 da largura da janela
-        # content_frame.geometry("1200x600")
-        content_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        content_frame = ttk.Frame(dmx_tab)
+        content_frame.pack(fill=tk.BOTH, expand=True)
 
         # Painel esquerdo - Lista de fixtures
         self.create_fixtures_panel(content_frame)
@@ -93,8 +105,45 @@ class MainWindow:
         # Painel direito - Universo DMX
         self.create_universe_panel(content_frame)
 
+        # --- Aba RDM ---
+        rdm_tab = ttk.Frame(self.notebook)
+        self.notebook.add(rdm_tab, text="RDM")
+
+        self.rdm_widget = RDMWidget(rdm_tab, self.controller)
+        self.rdm_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
         # Barra de status
         self.create_status_bar(main_frame)
+
+    def create_menu_bar(self):
+        """Cria a barra de menus"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # Menu Arquivo
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Arquivo", menu=file_menu)
+        file_menu.add_command(label="Novo", command=self.file_new, accelerator="Ctrl+N")
+        file_menu.add_command(label="Abrir...", command=self.file_open, accelerator="Ctrl+O")
+        file_menu.add_separator()
+        file_menu.add_command(label="Salvar", command=self.file_save, accelerator="Ctrl+S")
+        file_menu.add_command(label="Salvar Como...", command=self.file_save_as, accelerator="Ctrl+Shift+S")
+        file_menu.add_separator()
+        file_menu.add_command(label="Sair", command=self.on_closing)
+
+        # Menu Fixture
+        fixture_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Fixture", menu=fixture_menu)
+        fixture_menu.add_command(label="Adicionar Fixture...", command=self.add_from_config)
+        fixture_menu.add_command(label="Clonar Selecionada", command=self.clone_fixture)
+        fixture_menu.add_separator()
+        fixture_menu.add_command(label="Exportar como Template...", command=self.export_fixture_as_template)
+
+        # Atalhos de teclado
+        self.root.bind("<Control-n>", lambda e: self.file_new())
+        self.root.bind("<Control-o>", lambda e: self.file_open())
+        self.root.bind("<Control-s>", lambda e: self.file_save())
+        self.root.bind("<Control-Shift-S>", lambda e: self.file_save_as())
 
     def create_toolbar(self, parent):
         """Cria a barra de ferramentas"""
@@ -131,15 +180,12 @@ class MainWindow:
         )
 
         # Botões de fixture
-        ttk.Button(toolbar, text="Adicionar PAR Can", command=self.add_par_can).pack(
+        ttk.Button(toolbar, text="Adicionar Fixture", command=self.add_from_config).pack(
             side=tk.LEFT, padx=(0, 5)
         )
-        ttk.Button(
-            toolbar, text="Adicionar Moving Head", command=self.add_moving_head
-        ).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(
-            toolbar, text="Adicionar LED Strip", command=self.add_led_strip
-        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(toolbar, text="Clonar", command=self.clone_fixture).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
 
         # Separador
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(
@@ -258,6 +304,310 @@ class MainWindow:
         if ports:
             self.port_combo.set(ports[0])
 
+    # ------------------------------------------------------------------
+    # Operações de arquivo
+    # ------------------------------------------------------------------
+
+    def _update_title(self):
+        """Atualiza o título da janela com o nome do arquivo atual"""
+        base = "Controlador DMX512"
+        if self._current_file:
+            self.root.title(f"{base} — {os.path.basename(self._current_file)}")
+        else:
+            self.root.title(base)
+
+    def file_new(self):
+        """Novo projeto — limpa todas as fixtures"""
+        if self.controller.fixtures:
+            if not messagebox.askyesno("Novo", "Descartar fixtures atuais e criar novo projeto?"):
+                return
+        self.controller.clear_all_fixtures()
+        self._current_file = None
+        self._update_title()
+        self.update_fixtures_list()
+        self.clear_fixture_controls()
+
+    def file_open(self):
+        """Abre uma coleção de fixtures de um arquivo JSON"""
+        filepath = filedialog.askopenfilename(
+            title="Abrir Coleção de Fixtures",
+            filetypes=[("Coleção DMX", "*.dmxcol"), ("JSON", "*.json"), ("Todos", "*.*")],
+        )
+        if not filepath:
+            return
+        try:
+            self.controller.load_fixture_collection(filepath)
+            self._current_file = filepath
+            self._update_title()
+            self.update_fixtures_list()
+            self.clear_fixture_controls()
+            messagebox.showinfo("Sucesso", f"{len(self.controller.fixtures)} fixture(s) carregada(s)")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao abrir arquivo:\n{e}")
+
+    def file_save(self):
+        """Salva a coleção atual no arquivo corrente (ou chama Salvar Como)"""
+        if self._current_file:
+            try:
+                self.controller.save_fixture_collection(self._current_file)
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao salvar:\n{e}")
+        else:
+            self.file_save_as()
+
+    def file_save_as(self):
+        """Salva a coleção atual em um novo arquivo"""
+        filepath = filedialog.asksaveasfilename(
+            title="Salvar Coleção de Fixtures",
+            defaultextension=".dmxcol",
+            filetypes=[("Coleção DMX", "*.dmxcol"), ("JSON", "*.json"), ("Todos", "*.*")],
+        )
+        if not filepath:
+            return
+        try:
+            self.controller.save_fixture_collection(filepath)
+            self._current_file = filepath
+            self._update_title()
+            messagebox.showinfo("Sucesso", "Coleção salva com sucesso")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao salvar:\n{e}")
+
+    # ------------------------------------------------------------------
+    # Adicionar fixture de arquivo de configuração (template)
+    # ------------------------------------------------------------------
+
+    def _get_fixtures_dir(self) -> str:
+        """Retorna o caminho da pasta de templates de fixtures"""
+        # Tenta encontrar a pasta fixtures/ relativa ao projeto
+        here = Path(__file__).resolve()
+        # Sobe até encontrar a pasta fixtures/ (projeto raiz)
+        for parent in here.parents:
+            candidate = parent / "fixtures"
+            if candidate.is_dir():
+                return str(candidate)
+        return ""
+
+    def add_from_config(self):
+        """Adiciona uma fixture a partir de um arquivo de configuração"""
+        initial_dir = self._get_fixtures_dir()
+        filepath = filedialog.askopenfilename(
+            title="Selecionar Template de Fixture",
+            initialdir=initial_dir or None,
+            filetypes=[("Config Fixture", "*.dmxfix"), ("JSON", "*.json"), ("Todos", "*.*")],
+        )
+        if not filepath:
+            return
+
+        try:
+            import json as _json
+            with open(filepath, "r", encoding="utf-8") as f:
+                cfg = _json.load(f)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao ler configuração:\n{e}")
+            return
+
+        # Mostra diálogo com dados pré-preenchidos
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Adicionar Fixture de Configuração")
+        dialog.geometry("350x280")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Info do template (somente leitura)
+        info_frame = ttk.LabelFrame(dialog, text="Configuração")
+        info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+
+        cfg_name = cfg.get("name", "Desconhecido")
+        cfg_manufacturer = cfg.get("manufacturer", "-")
+        cfg_brand = cfg.get("brand", "-")
+        cfg_model = cfg.get("model", "-")
+        cfg_channels = len(cfg.get("channels", []))
+
+        ttk.Label(info_frame, text=f"Fixture: {cfg_name}").pack(anchor=tk.W, padx=5)
+        ttk.Label(info_frame, text=f"Fabricante: {cfg_manufacturer} | Marca: {cfg_brand}").pack(anchor=tk.W, padx=5)
+        ttk.Label(info_frame, text=f"Modelo: {cfg_model} | Canais: {cfg_channels}").pack(anchor=tk.W, padx=5, pady=(0, 5))
+
+        # Nome
+        ttk.Label(dialog, text="Nome da fixture:").pack(pady=(5, 2))
+        name_var = tk.StringVar(value=cfg_name)
+        name_entry = ttk.Entry(dialog, textvariable=name_var)
+        name_entry.pack(padx=10, fill=tk.X)
+
+        # Endereço
+        ttk.Label(dialog, text="Endereço inicial:").pack(pady=(5, 2))
+        next_addr = self._get_next_available_address()
+        addr_var = tk.StringVar(value=str(next_addr))
+        ttk.Entry(dialog, textvariable=addr_var).pack(padx=10, fill=tk.X)
+
+        def do_add():
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showerror("Erro", "Nome é obrigatório")
+                return
+            try:
+                address = int(addr_var.get())
+                if not (1 <= address <= 512):
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Erro", "Endereço deve ser entre 1 e 512")
+                return
+
+            try:
+                fixture = Fixture.from_config(filepath, name, address)
+                if self.controller.add_fixture(fixture):
+                    self.update_fixtures_list()
+                    dialog.destroy()
+                    messagebox.showinfo("Sucesso", f"Fixture '{name}' adicionada")
+                else:
+                    messagebox.showerror("Erro", "Falha ao adicionar fixture")
+            except Exception as ex:
+                messagebox.showerror("Erro", f"Falha ao criar fixture:\n{ex}")
+
+        btns = ttk.Frame(dialog)
+        btns.pack(pady=10)
+        ttk.Button(btns, text="Adicionar", command=do_add).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btns, text="Cancelar", command=dialog.destroy).pack(side=tk.LEFT)
+        name_entry.focus()
+
+    # ------------------------------------------------------------------
+    # Clonar fixture
+    # ------------------------------------------------------------------
+
+    def clone_fixture(self):
+        """Clona a fixture selecionada com novo nome e próximo endereço"""
+        selection = self.fixtures_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Aviso", "Selecione uma fixture para clonar")
+            return
+
+        fixture_name = self.fixtures_listbox.get(selection[0])
+        fixture = self.controller.get_fixture(fixture_name)
+        if not fixture:
+            return
+
+        next_addr = self._get_next_available_address()
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Clonar Fixture")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text=f"Clonando: {fixture.name}").pack(pady=(10, 5))
+
+        ttk.Label(dialog, text="Novo nome:").pack(pady=(5, 2))
+        name_var = tk.StringVar(value=f"{fixture.name} (cópia)")
+        name_entry = ttk.Entry(dialog, textvariable=name_var)
+        name_entry.pack(padx=10, fill=tk.X)
+
+        ttk.Label(dialog, text="Endereço inicial:").pack(pady=(5, 2))
+        addr_var = tk.StringVar(value=str(next_addr))
+        ttk.Entry(dialog, textvariable=addr_var).pack(padx=10, fill=tk.X)
+
+        def do_clone():
+            new_name = name_var.get().strip()
+            if not new_name:
+                messagebox.showerror("Erro", "Nome é obrigatório")
+                return
+            try:
+                address = int(addr_var.get())
+                if not (1 <= address <= 512):
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Erro", "Endereço deve ser entre 1 e 512")
+                return
+
+            cloned = fixture.clone(new_name, address)
+            if self.controller.add_fixture(cloned):
+                self.update_fixtures_list()
+                dialog.destroy()
+                messagebox.showinfo("Sucesso", f"Fixture '{new_name}' clonada")
+            else:
+                messagebox.showerror("Erro", "Falha ao clonar fixture")
+
+        btns = ttk.Frame(dialog)
+        btns.pack(pady=10)
+        ttk.Button(btns, text="Clonar", command=do_clone).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btns, text="Cancelar", command=dialog.destroy).pack(side=tk.LEFT)
+        name_entry.select_range(0, tk.END)
+        name_entry.focus()
+
+    # ------------------------------------------------------------------
+    # Exportar fixture como template
+    # ------------------------------------------------------------------
+
+    def export_fixture_as_template(self):
+        """Exporta a fixture selecionada como arquivo de configuração (.dmxfix)"""
+        selection = self.fixtures_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Aviso", "Selecione uma fixture para exportar")
+            return
+
+        fixture_name = self.fixtures_listbox.get(selection[0])
+        fixture = self.controller.get_fixture(fixture_name)
+        if not fixture:
+            return
+
+        # Diálogo para preencher metadados antes de salvar
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Exportar Fixture como Template")
+        dialog.geometry("350x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text=f"Fixture: {fixture.name}", font=("Arial", 10, "bold")).pack(
+            pady=(10, 5)
+        )
+        ttk.Label(dialog, text=f"Canais: {fixture.get_channel_count()}").pack()
+
+        # Metadados editáveis
+        metadata = getattr(fixture, "config_metadata", {})
+
+        ttk.Label(dialog, text="Nome do template:").pack(pady=(10, 2))
+        tpl_name_var = tk.StringVar(value=metadata.get("fixture_name", fixture.name))
+        ttk.Entry(dialog, textvariable=tpl_name_var).pack(padx=10, fill=tk.X)
+
+        ttk.Label(dialog, text="Fabricante:").pack(pady=(5, 2))
+        mfr_var = tk.StringVar(value=metadata.get("manufacturer", ""))
+        ttk.Entry(dialog, textvariable=mfr_var).pack(padx=10, fill=tk.X)
+
+        ttk.Label(dialog, text="Marca / Modelo:").pack(pady=(5, 2))
+        model_frame = ttk.Frame(dialog)
+        model_frame.pack(padx=10, fill=tk.X)
+        brand_var = tk.StringVar(value=metadata.get("brand", ""))
+        model_var = tk.StringVar(value=metadata.get("model", ""))
+        ttk.Entry(model_frame, textvariable=brand_var, width=18).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        ttk.Label(model_frame, text=" / ").pack(side=tk.LEFT)
+        ttk.Entry(model_frame, textvariable=model_var, width=18).pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+        def do_export():
+            filepath = filedialog.asksaveasfilename(
+                title="Salvar Template de Fixture",
+                defaultextension=".dmxfix",
+                filetypes=[("Config Fixture", "*.dmxfix"), ("JSON", "*.json"), ("Todos", "*.*")],
+                parent=dialog,
+            )
+            if not filepath:
+                return
+            # Atualiza metadados temporariamente para exportação
+            fixture.config_metadata = {
+                "fixture_name": tpl_name_var.get().strip() or fixture.name,
+                "manufacturer": mfr_var.get().strip(),
+                "brand": brand_var.get().strip(),
+                "model": model_var.get().strip(),
+            }
+            try:
+                fixture.save_config(filepath)
+                dialog.destroy()
+                messagebox.showinfo("Sucesso", f"Template salvo em:\n{filepath}")
+            except Exception as ex:
+                messagebox.showerror("Erro", f"Falha ao exportar:\n{ex}")
+
+        btns = ttk.Frame(dialog)
+        btns.pack(pady=10)
+        ttk.Button(btns, text="Exportar", command=do_export).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btns, text="Cancelar", command=dialog.destroy).pack(side=tk.LEFT)
+
     def connect_dmx(self):
         """Conecta ao dispositivo DMX"""
         port = self.port_var.get()
@@ -295,85 +645,13 @@ class MainWindow:
         self.update_fixture_widgets()
         self.universe_widget.update_display()
 
-    def add_par_can(self):
-        """Adiciona um PAR Can"""
-        self._add_fixture_dialog("PAR Can", FixtureType.PAR_CAN)
-
-    def add_moving_head(self):
-        """Adiciona um Moving Head"""
-        self._add_fixture_dialog("Moving Head", FixtureType.MOVING_HEAD)
-
-    def add_led_strip(self):
-        """Adiciona uma LED Strip"""
-        self._add_fixture_dialog("LED Strip", FixtureType.LED_STRIP)
-
-    def _add_fixture_dialog(self, fixture_type_name: str, fixture_type: FixtureType):
-        """Diálogo para adicionar fixture"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(f"Adicionar {fixture_type_name}")
-        dialog.geometry("300x150")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        # Nome do fixture
-        ttk.Label(dialog, text="Nome:").pack(pady=(10, 5))
-        name_var = tk.StringVar()
-        name_entry = ttk.Entry(dialog, textvariable=name_var)
-        name_entry.pack(pady=(0, 10))
-
-        # Endereço inicial
-        ttk.Label(dialog, text="Endereço inicial:").pack(pady=(0, 5))
-        address_var = tk.StringVar(value="1")
-        address_entry = ttk.Entry(dialog, textvariable=address_var)
-        address_entry.pack(pady=(0, 10))
-
-        def add_fixture():
-            name = name_var.get().strip()
-            if not name:
-                messagebox.showerror("Erro", "Nome é obrigatório")
-                return
-
-            try:
-                address = int(address_var.get())
-                if address < 1 or address > 512:
-                    raise ValueError()
-            except ValueError:
-                messagebox.showerror("Erro", "Endereço deve ser entre 1 e 512")
-                return
-
-            # Cria o fixture
-            if fixture_type == FixtureType.PAR_CAN:
-                fixture = self.controller.create_par_can(name, address)
-            elif fixture_type == FixtureType.MOVING_HEAD:
-                fixture = self.controller.create_moving_head(name, address)
-            elif fixture_type == FixtureType.LED_STRIP:
-                fixture = self.controller.create_led_strip(name, address)
-            else:
-                fixture = Fixture(name, fixture_type, address)
-
-            # Adiciona ao controlador
-            if self.controller.add_fixture(fixture):
-                self.update_fixtures_list()
-                dialog.destroy()
-                messagebox.showinfo(
-                    "Sucesso", f"{fixture_type_name} '{name}' adicionado"
-                )
-            else:
-                messagebox.showerror("Erro", "Falha ao adicionar fixture")
-
-        # Botões
-        buttons_frame = ttk.Frame(dialog)
-        buttons_frame.pack(pady=10)
-
-        ttk.Button(buttons_frame, text="Adicionar", command=add_fixture).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        ttk.Button(buttons_frame, text="Cancelar", command=dialog.destroy).pack(
-            side=tk.LEFT
-        )
-
-        # Foco no nome
-        name_entry.focus()
+    def _get_next_available_address(self) -> int:
+        """Calcula o próximo endereço DMX disponível após todas as fixtures existentes"""
+        if not self.controller.fixtures:
+            return 1
+        max_end = max(f.get_end_address() for f in self.controller.fixtures)
+        next_addr = max_end + 1
+        return min(next_addr, 512)
 
     def remove_fixture(self):
         """Remove fixture selecionado"""
@@ -456,26 +734,29 @@ class MainWindow:
         for fixture in self.controller.get_all_fixtures():
             self.fixtures_listbox.insert(tk.END, fixture.name)
 
-        # Oculta label inicial
-        self.no_fixture_label.pack_forget()
-
     def on_fixture_select(self, event):
         """Callback para seleção de fixture"""
         selection = self.fixtures_listbox.curselection()
         if selection:
             fixture_name = self.fixtures_listbox.get(selection[0])
             self.show_fixture_controls(fixture_name)
-        else:
-            self.clear_fixture_controls()
+        # Não limpar controles quando o listbox perde o foco
 
     def show_fixture_controls(self, fixture_name: str):
         """Mostra controles para um fixture específico"""
+        # Evita reconstruir se já está exibindo o mesmo fixture
+        if self._displayed_fixture == fixture_name and fixture_name in self.fixture_widgets:
+            return
+
         fixture = self.controller.get_fixture(fixture_name)
         if not fixture:
             return
 
         # Limpa controles existentes
         self.clear_fixture_controls()
+
+        # Oculta label inicial
+        self.no_fixture_label.pack_forget()
 
         # Cria widget de fixture
         fixture_widget = FixtureWidget(
@@ -485,6 +766,7 @@ class MainWindow:
 
         # Armazena referência
         self.fixture_widgets[fixture_name] = fixture_widget
+        self._displayed_fixture = fixture_name
 
     def clear_fixture_controls(self):
         """Limpa controles de fixture"""
@@ -492,6 +774,7 @@ class MainWindow:
         for widget in self.fixture_widgets.values():
             widget.destroy()
         self.fixture_widgets.clear()
+        self._displayed_fixture = None
 
         # Mostra label inicial
         self.no_fixture_label.pack(expand=True)

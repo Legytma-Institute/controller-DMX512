@@ -5,10 +5,13 @@ Este módulo contém a classe DMXController que é o ponto central
 para controle de dispositivos de iluminação via DMX512.
 """
 
+import json
 import logging
+import queue
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .channel import Channel, ChannelType
 from .fixture import Fixture, FixtureType, PredefinedFixtures
@@ -16,14 +19,28 @@ from .protocol import DMXBreakLength, DMXProtocol
 from .rdm import (
     ALL_DEVICES_UID_INT,
     DiscoveryResult,
+    PID_DEVICE_INFO,
+    PID_DEVICE_LABEL,
+    PID_DEVICE_MODEL_DESCRIPTION,
     PID_DISC_MUTE,
     PID_DISC_UNIQUE_BRANCH,
     PID_DISC_UN_MUTE,
+    PID_DMX_PERSONALITY_DESCRIPTION,
+    PID_DMX_START_ADDRESS,
+    PID_IDENTIFY_DEVICE,
+    PID_MANUFACTURER_LABEL,
+    PID_SOFTWARE_VERSION_LABEL,
+    PID_SUPPORTED_PARAMETERS,
     RDMCommandClass,
+    RDMDeviceInfo,
+    RDMPersonality,
+    RDMResponseType,
     RDMUID,
     build_rdm_request,
     decode_discovery_response,
+    parse_device_info_response,
     parse_rdm_message,
+    parse_supported_parameters_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +80,9 @@ class DMXController:
 
         self.rdm_controller_uid = RDMUID.from_str(rdm_controller_uid)
         self._rdm_transaction_number = 0
+        self.rdm_devices: Dict[str, RDMDeviceInfo] = {}
+        self._rdm_queue: queue.Queue[Tuple[Callable, tuple, dict]] = queue.Queue()
+        self.on_rdm_device_found: Optional[Callable[[RDMDeviceInfo], None]] = None
 
         # Protocolo de comunicação
         self.protocol: Optional[DMXProtocol] = None
@@ -234,6 +254,163 @@ class DMXController:
         finally:
             if was_running and self.protocol and self.protocol.is_connected:
                 self._start_update_thread()
+
+    # ------------------------------------------------------------------
+    # RDM GET / SET helpers
+    # ------------------------------------------------------------------
+
+    def rdm_get(
+        self,
+        uid: RDMUID,
+        pid: int,
+        parameter_data: bytes = b"",
+        *,
+        sub_device: int = 0,
+        timeout_s: float = 0.3,
+    ) -> Optional[bytes]:
+        if not self.protocol or not self.protocol.is_connected:
+            return None
+        pkt = build_rdm_request(
+            dest_uid=uid,
+            src_uid=self.rdm_controller_uid,
+            transaction_number=self._next_rdm_transaction_number(),
+            port_id=1,
+            message_count=0,
+            sub_device=sub_device,
+            command_class=RDMCommandClass.GET_COMMAND,
+            parameter_id=pid,
+            parameter_data=parameter_data,
+        )
+        raw = self._rdm_send_request(pkt, timeout_s=timeout_s)
+        if raw is None:
+            return None
+        try:
+            msg = parse_rdm_message(raw)
+        except Exception:
+            return None
+        if msg.command_class == RDMCommandClass.GET_COMMAND_RESPONSE:
+            resp_type = msg.port_id_or_response_type
+            if resp_type == RDMResponseType.ACK:
+                return msg.parameter_data
+            if resp_type == RDMResponseType.NACK_REASON:
+                nack = int.from_bytes(msg.parameter_data[:2], "big") if len(msg.parameter_data) >= 2 else 0
+                logger.warning("RDM NACK pid=0x%04x nack=0x%04x", pid, nack)
+                return None
+        return None
+
+    def rdm_set(
+        self,
+        uid: RDMUID,
+        pid: int,
+        parameter_data: bytes = b"",
+        *,
+        sub_device: int = 0,
+        timeout_s: float = 0.3,
+    ) -> bool:
+        if not self.protocol or not self.protocol.is_connected:
+            return False
+        pkt = build_rdm_request(
+            dest_uid=uid,
+            src_uid=self.rdm_controller_uid,
+            transaction_number=self._next_rdm_transaction_number(),
+            port_id=1,
+            message_count=0,
+            sub_device=sub_device,
+            command_class=RDMCommandClass.SET_COMMAND,
+            parameter_id=pid,
+            parameter_data=parameter_data,
+        )
+        raw = self._rdm_send_request(pkt, timeout_s=timeout_s)
+        if raw is None:
+            return False
+        try:
+            msg = parse_rdm_message(raw)
+        except Exception:
+            return False
+        if msg.command_class == RDMCommandClass.SET_COMMAND_RESPONSE:
+            return msg.port_id_or_response_type == RDMResponseType.ACK
+        return False
+
+    # ------------------------------------------------------------------
+    # RDM high-level commands
+    # ------------------------------------------------------------------
+
+    def rdm_identify(self, uid: RDMUID, on: bool = True) -> bool:
+        return self.rdm_set(uid, PID_IDENTIFY_DEVICE, bytes([0x01 if on else 0x00]))
+
+    def rdm_set_dmx_address(self, uid: RDMUID, address: int) -> bool:
+        if not (1 <= address <= 512):
+            raise ValueError("DMX address must be 1–512")
+        return self.rdm_set(
+            uid, PID_DMX_START_ADDRESS, bytes([(address >> 8) & 0xFF, address & 0xFF])
+        )
+
+    def rdm_set_device_label(self, uid: RDMUID, label: str) -> bool:
+        return self.rdm_set(uid, PID_DEVICE_LABEL, label.encode("utf-8")[:32])
+
+    def rdm_get_device_info(self, uid: RDMUID) -> Optional[RDMDeviceInfo]:
+        data = self.rdm_get(uid, PID_DEVICE_INFO)
+        if data is None:
+            return None
+        try:
+            return parse_device_info_response(uid, data)
+        except Exception:
+            return None
+
+    def rdm_get_full_device_info(self, uid: RDMUID) -> Optional[RDMDeviceInfo]:
+        info = self.rdm_get_device_info(uid)
+        if info is None:
+            return None
+
+        # Manufacturer label
+        data = self.rdm_get(uid, PID_MANUFACTURER_LABEL)
+        if data:
+            info.manufacturer_label = data.decode("utf-8", errors="replace").rstrip("\x00")
+
+        # Device model description
+        data = self.rdm_get(uid, PID_DEVICE_MODEL_DESCRIPTION)
+        if data:
+            info.device_model_description = data.decode("utf-8", errors="replace").rstrip("\x00")
+
+        # Device label
+        data = self.rdm_get(uid, PID_DEVICE_LABEL)
+        if data:
+            info.device_label = data.decode("utf-8", errors="replace").rstrip("\x00")
+
+        # Software version label
+        data = self.rdm_get(uid, PID_SOFTWARE_VERSION_LABEL)
+        if data:
+            info.software_version_label = data.decode("utf-8", errors="replace").rstrip("\x00")
+
+        # Supported parameters
+        data = self.rdm_get(uid, PID_SUPPORTED_PARAMETERS)
+        if data:
+            info.supported_parameters = parse_supported_parameters_response(data)
+
+        # Personalities
+        for p in range(1, info.personality_count + 1):
+            data = self.rdm_get(uid, PID_DMX_PERSONALITY_DESCRIPTION, bytes([p]))
+            if data and len(data) >= 3:
+                footprint = (data[0] << 8) | data[1]
+                desc = data[2:].decode("utf-8", errors="replace").rstrip("\x00")
+                info.personalities[p] = RDMPersonality(index=p, dmx_footprint=footprint, description=desc)
+
+        # Cache in inventory
+        self.rdm_devices[str(uid)] = info
+        return info
+
+    def rdm_discover_and_populate(self, *, timeout_s: float = 0.3) -> List[RDMDeviceInfo]:
+        uids = self.rdm_discover_devices(timeout_s=timeout_s)
+        devices: List[RDMDeviceInfo] = []
+        for uid in uids:
+            info = self.rdm_get_full_device_info(uid)
+            if info is not None:
+                devices.append(info)
+        return devices
+
+    # ------------------------------------------------------------------
+    # Fixture management
+    # ------------------------------------------------------------------
 
     def add_fixture(self, fixture: Fixture) -> bool:
         """
@@ -461,6 +638,19 @@ class DMXController:
             self.update_thread = None
         logger.debug("Thread de atualização parada")
 
+    def schedule_rdm(self, func: Callable, *args: Any, **kwargs: Any) -> None:
+        self._rdm_queue.put((func, args, kwargs))
+
+    def _process_rdm_queue(self) -> None:
+        try:
+            func, args, kwargs = self._rdm_queue.get_nowait()
+        except queue.Empty:
+            return
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            logger.error("Erro ao processar transação RDM: %s", e)
+
     def _update_loop(self):
         """Loop principal de atualização do universo"""
         while self.running:
@@ -471,6 +661,10 @@ class DMXController:
                 # Envia universo via protocolo
                 if self.protocol and self.protocol.is_connected:
                     self.protocol.send_dmx_frame(self.universe)
+
+                # Processa uma transação RDM pendente (se houver)
+                if self.protocol and self.protocol.is_connected:
+                    self._process_rdm_queue()
 
                 # Chama callback se definido
                 if self.on_universe_update:
@@ -510,6 +704,42 @@ class DMXController:
     ) -> Fixture:
         """Cria uma LED Strip"""
         return PredefinedFixtures.create_led_strip(name, start_address, led_count)
+
+    # ------------------------------------------------------------------
+    # Persistência de coleção de fixtures
+    # ------------------------------------------------------------------
+
+    def save_fixture_collection(self, filepath: Union[str, Path]) -> None:
+        """Salva a coleção atual de fixtures em arquivo JSON"""
+        data = {
+            "version": 1,
+            "fixtures": [f.to_dict() for f in self.fixtures],
+        }
+        path = Path(filepath)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.info("Coleção salva em %s (%d fixtures)", path, len(self.fixtures))
+
+    def load_fixture_collection(self, filepath: Union[str, Path]) -> None:
+        """Carrega uma coleção de fixtures de um arquivo JSON"""
+        path = Path(filepath)
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.clear_all_fixtures()
+
+        for fx_data in data.get("fixtures", []):
+            fixture = Fixture.from_dict(fx_data)
+            self.add_fixture(fixture)
+
+        logger.info("Coleção carregada de %s (%d fixtures)", path, len(self.fixtures))
+
+    def clear_all_fixtures(self) -> None:
+        """Remove todas as fixtures"""
+        self.fixtures.clear()
+        self.fixtures_by_name.clear()
+        self.universe = [0] * 512
+        logger.info("Todas as fixtures foram removidas")
 
     def __enter__(self):
         """Context manager entry"""
