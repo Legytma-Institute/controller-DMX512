@@ -13,6 +13,18 @@ from typing import Any, Callable, Dict, List, Optional
 from .channel import Channel, ChannelType
 from .fixture import Fixture, FixtureType, PredefinedFixtures
 from .protocol import DMXBreakLength, DMXProtocol
+from .rdm import (
+    ALL_DEVICES_UID_INT,
+    DiscoveryResult,
+    PID_DISC_MUTE,
+    PID_DISC_UNIQUE_BRANCH,
+    PID_DISC_UN_MUTE,
+    RDMCommandClass,
+    RDMUID,
+    build_rdm_request,
+    decode_discovery_response,
+    parse_rdm_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +43,9 @@ class DMXController:
         port: str = None,
         baudrate: int = 250000,
         break_length: DMXBreakLength = DMXBreakLength.STANDARD,
+        rs485_direction: str = "none",
+        rs485_tx_level: bool = True,
+        rdm_controller_uid: str = "7fff:00000001",
     ):
         """
         Inicializa o controlador DMX512
@@ -43,6 +58,11 @@ class DMXController:
         self.port = port
         self.baudrate = baudrate
         self.break_length = break_length
+        self.rs485_direction = rs485_direction
+        self.rs485_tx_level = rs485_tx_level
+
+        self.rdm_controller_uid = RDMUID.from_str(rdm_controller_uid)
+        self._rdm_transaction_number = 0
 
         # Protocolo de comunicação
         self.protocol: Optional[DMXProtocol] = None
@@ -89,7 +109,13 @@ class DMXController:
                 return False
 
         # Cria e conecta o protocolo
-        self.protocol = DMXProtocol(self.port, self.baudrate, self.break_length)
+        self.protocol = DMXProtocol(
+            self.port,
+            self.baudrate,
+            self.break_length,
+            rs485_direction=self.rs485_direction,
+            rs485_tx_level=self.rs485_tx_level,
+        )
 
         if self.protocol.connect():
             self._start_update_thread()
@@ -108,6 +134,106 @@ class DMXController:
             self.protocol = None
 
         logger.info("Desconectado do dispositivo DMX")
+
+    def _next_rdm_transaction_number(self) -> int:
+        self._rdm_transaction_number = (self._rdm_transaction_number + 1) & 0xFF
+        return self._rdm_transaction_number
+
+    def _rdm_send_request(self, packet: bytes, *, timeout_s: float = 0.3) -> Optional[bytes]:
+        if not self.protocol or not self.protocol.is_connected:
+            return None
+        return self.protocol.rdm_transaction(packet, response_timeout_s=timeout_s)
+
+    def _rdm_send_discovery_request(
+        self, packet: bytes, *, timeout_s: float = 0.3
+    ) -> bytes:
+        if not self.protocol or not self.protocol.is_connected:
+            return b""
+        return self.protocol.rdm_discovery_transaction(packet, response_timeout_s=timeout_s)
+
+    def rdm_discover_devices(
+        self,
+        *,
+        timeout_s: float = 0.3,
+        max_devices: int = 256,
+    ) -> List[RDMUID]:
+        if not self.protocol or not self.protocol.is_connected:
+            raise RuntimeError("Controlador não conectado")
+
+        was_running = self.running
+        if was_running:
+            self._stop_update_thread()
+
+        discovered: List[RDMUID] = []
+        try:
+            unmute = build_rdm_request(
+                dest_uid=RDMUID.all_devices(),
+                src_uid=self.rdm_controller_uid,
+                transaction_number=self._next_rdm_transaction_number(),
+                port_id=1,
+                message_count=0,
+                sub_device=0,
+                command_class=RDMCommandClass.DISCOVERY_COMMAND,
+                parameter_id=PID_DISC_UN_MUTE,
+                parameter_data=b"",
+            )
+            self._rdm_send_request(unmute, timeout_s=timeout_s)
+
+            ranges: List[tuple[int, int]] = [(0, ALL_DEVICES_UID_INT)]
+            while ranges and len(discovered) < max_devices:
+                lower_int, upper_int = ranges.pop()
+                lower_uid = RDMUID.from_int(lower_int)
+                upper_uid = RDMUID.from_int(upper_int)
+
+                branch = build_rdm_request(
+                    dest_uid=RDMUID.all_devices(),
+                    src_uid=self.rdm_controller_uid,
+                    transaction_number=self._next_rdm_transaction_number(),
+                    port_id=1,
+                    message_count=0,
+                    sub_device=0,
+                    command_class=RDMCommandClass.DISCOVERY_COMMAND,
+                    parameter_id=PID_DISC_UNIQUE_BRANCH,
+                    parameter_data=lower_uid.to_bytes() + upper_uid.to_bytes(),
+                )
+
+                raw = self._rdm_send_discovery_request(branch, timeout_s=timeout_s)
+                result, uid = decode_discovery_response(raw)
+                if result == DiscoveryResult.NO_RESPONSE:
+                    continue
+                if result == DiscoveryResult.VALID and uid is not None:
+                    mute = build_rdm_request(
+                        dest_uid=uid,
+                        src_uid=self.rdm_controller_uid,
+                        transaction_number=self._next_rdm_transaction_number(),
+                        port_id=1,
+                        message_count=0,
+                        sub_device=0,
+                        command_class=RDMCommandClass.DISCOVERY_COMMAND,
+                        parameter_id=PID_DISC_MUTE,
+                        parameter_data=b"",
+                    )
+                    resp = self._rdm_send_request(mute, timeout_s=timeout_s)
+                    if resp is not None:
+                        try:
+                            parse_rdm_message(resp)
+                            discovered.append(uid)
+                        except Exception:
+                            pass
+                    continue
+
+                if lower_int == upper_int:
+                    continue
+
+                mid = (lower_int + upper_int) // 2
+                ranges.append((lower_int, mid))
+                ranges.append((mid + 1, upper_int))
+
+            return discovered
+
+        finally:
+            if was_running and self.protocol and self.protocol.is_connected:
+                self._start_update_thread()
 
     def add_fixture(self, fixture: Fixture) -> bool:
         """
