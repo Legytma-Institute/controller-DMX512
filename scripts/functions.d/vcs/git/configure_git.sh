@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../configuration/git/configure_safe_directories.sh"
+
+#
+# Configure GIT
+#
+function configure_git() {
+    git config --global user.email "windol@legytma.com.br"
+    git config --global user.name "Alex Manoel Ferreira Silva (Windol)"
+    git config --global user.signingkey "key::ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAEAQC2FBLyt5JGrqpmxp+YJvuv+rzd248D1Z/u04wMss6Ku0swq5hfnp6jwKdouY8iBKOTn57F/j9tBAavDso0aOPpKQDzWh+xJ7u4Juqeo23uI0A8lfYLWqoGk+wTfPu41PIiUtp+ekyGVTqpvfouPrL++6GOYWvPF37AvSC+Vif4KiIa514wOmeipHF7JgvVO7Dt9o+QzmlEqirqbl3v7u2IQXoVFUPGPCJM9Qt6KVp5sZ57+IZvX7LLKiY9dyFNZYfHAGHRRTKXTbl2/YyaxVuZmTX8BjcGqDoU5cXeD2GZuf2ZCZrUf1VxlzRYtLYP9mFjUvvDNC1L0dec+z8cI3Pf0FJjGXrDuUBSBMG7YC34HnA4BThcPwKS0q/mvKeg1XV3vlM1+9CR4UK7BpJXcQsDXPFZHdhDNXWvor46nmqUvhzLJJGeUIwl/ScP7nuLvNqky5JhZ+KjncBLuq/GCugGzjUDTxXotMZa7jHrAQo+AcqtXkLCrAe7dtFNTse6jwEdwEBcF6a4oNJJmRR97vxRPu0k80doyA3n1K4VVzhMiO5lsqvtlGMvefhp4ICds9fUW+Lqh9cXkQH4JXsvi+gT7u67LoNI5yYzKEn6YuCOeSVmtlJV8j8M3LkodBLNP9jo4HRgzIPQtSr+cWfcNpnUI1Z4WUu6UJ2w+TccsZGYH4QaMd6ovnXfMqz0JGTJkFeSfeZFVdUccAeB1xRhNLJYi4iBjOqAUVSrlJhCGD9bqo3bjn/ZEYaUQh+pBrSnpvPyFmbtsez11dV++Ix56qRacIVQVa0W0hr6JpTOHNkZQvxsDy2LPgeoTVYn0SuVEK1FFZLH0BSqxIfKr5KKcJiJZXWoMLRpL/vJMvBoRU1OGIHF0v1DpL5kdFPTEgAE/bA1rzW+933or7LCsI37/XpoKSvFPSVU57KDEjnRDjOLwLQZUZUL8AOQeSQqd7NJEarSFfoSkDgeGnGzGWUJlpDc6UtIx317NLj3a8Vnx7w1OJZBHf6BgTL2Jbq3VhP8MXoXJT8jswwxl6VPXOM7/7SCGPUP61l7M4C26M9QKQWBVLRDxR4Vc0slKHJkteKhI5LUILlYJDfmXcYLafG4zebvTGfmLBvh9uRbIse1ygbr4HqWBCIrr3blG2pCmWvlwlGH7CrHgJdDsHQQOI4XVvgfCqOBYkdMYJeAmyy2+Uw55gdNdHqtdspy6qXo/pgTVW8kgXfOuAr18ZpVHyZD59BODWEqaOSlV0ju/QsjRUwKQZS+234tDRGKdLpK879EpNVPOd6caQdHHWFtaSSgiRV4FPSHVUIxd5cSTD7P+3VJB8J6rY4cm32rlAsfNyhlXio4I1/aL79p8Q8vvYkR6FM5 rsa-key-20221121"
+    git config --global gpg.format ssh
+    git config --global commit.gpgsign true
+
+    configure_safe_directories "${CURRENT_DIR}"
+}
+
+export -f configure_git

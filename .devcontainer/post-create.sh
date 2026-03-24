@@ -7,6 +7,13 @@ THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Make scripts executable
 sudo chmod -R +x "${THIS_DIR}"/../scripts/*.sh
 
+if [ ! -f "${THIS_DIR}/../scripts/functions.sh" ]; then
+    rm -rf /tmp/bash-lib
+    git clone --depth=1 git@github.com:Legytma/bash-lib.git /tmp/bash-lib
+    bash /tmp/bash-lib/setup.sh
+    rm -rf /tmp/bash-lib
+fi
+
 # shellcheck source=../scripts/functions.sh
 source "${THIS_DIR}"/../scripts/functions.sh
 
