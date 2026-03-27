@@ -159,7 +159,9 @@ class DMXController:
         self._rdm_transaction_number = (self._rdm_transaction_number + 1) & 0xFF
         return self._rdm_transaction_number
 
-    def _rdm_send_request(self, packet: bytes, *, timeout_s: float = 0.3) -> Optional[bytes]:
+    def _rdm_send_request(
+        self, packet: bytes, *, timeout_s: float = 0.3
+    ) -> Optional[bytes]:
         if not self.protocol or not self.protocol.is_connected:
             return None
         return self.protocol.rdm_transaction(packet, response_timeout_s=timeout_s)
@@ -169,7 +171,9 @@ class DMXController:
     ) -> bytes:
         if not self.protocol or not self.protocol.is_connected:
             return b""
-        return self.protocol.rdm_discovery_transaction(packet, response_timeout_s=timeout_s)
+        return self.protocol.rdm_discovery_transaction(
+            packet, response_timeout_s=timeout_s
+        )
 
     def rdm_discover_devices(
         self,
@@ -293,7 +297,11 @@ class DMXController:
             if resp_type == RDMResponseType.ACK:
                 return msg.parameter_data
             if resp_type == RDMResponseType.NACK_REASON:
-                nack = int.from_bytes(msg.parameter_data[:2], "big") if len(msg.parameter_data) >= 2 else 0
+                nack = (
+                    int.from_bytes(msg.parameter_data[:2], "big")
+                    if len(msg.parameter_data) >= 2
+                    else 0
+                )
                 logger.warning("RDM NACK pid=0x%04x nack=0x%04x", pid, nack)
                 return None
         return None
@@ -365,12 +373,16 @@ class DMXController:
         # Manufacturer label
         data = self.rdm_get(uid, PID_MANUFACTURER_LABEL)
         if data:
-            info.manufacturer_label = data.decode("utf-8", errors="replace").rstrip("\x00")
+            info.manufacturer_label = data.decode("utf-8", errors="replace").rstrip(
+                "\x00"
+            )
 
         # Device model description
         data = self.rdm_get(uid, PID_DEVICE_MODEL_DESCRIPTION)
         if data:
-            info.device_model_description = data.decode("utf-8", errors="replace").rstrip("\x00")
+            info.device_model_description = data.decode(
+                "utf-8", errors="replace"
+            ).rstrip("\x00")
 
         # Device label
         data = self.rdm_get(uid, PID_DEVICE_LABEL)
@@ -380,7 +392,9 @@ class DMXController:
         # Software version label
         data = self.rdm_get(uid, PID_SOFTWARE_VERSION_LABEL)
         if data:
-            info.software_version_label = data.decode("utf-8", errors="replace").rstrip("\x00")
+            info.software_version_label = data.decode("utf-8", errors="replace").rstrip(
+                "\x00"
+            )
 
         # Supported parameters
         data = self.rdm_get(uid, PID_SUPPORTED_PARAMETERS)
@@ -393,13 +407,17 @@ class DMXController:
             if data and len(data) >= 3:
                 footprint = (data[0] << 8) | data[1]
                 desc = data[2:].decode("utf-8", errors="replace").rstrip("\x00")
-                info.personalities[p] = RDMPersonality(index=p, dmx_footprint=footprint, description=desc)
+                info.personalities[p] = RDMPersonality(
+                    index=p, dmx_footprint=footprint, description=desc
+                )
 
         # Cache in inventory
         self.rdm_devices[str(uid)] = info
         return info
 
-    def rdm_discover_and_populate(self, *, timeout_s: float = 0.3) -> List[RDMDeviceInfo]:
+    def rdm_discover_and_populate(
+        self, *, timeout_s: float = 0.3
+    ) -> List[RDMDeviceInfo]:
         uids = self.rdm_discover_devices(timeout_s=timeout_s)
         devices: List[RDMDeviceInfo] = []
         for uid in uids:

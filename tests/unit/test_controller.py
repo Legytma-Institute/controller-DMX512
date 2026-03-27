@@ -35,8 +35,9 @@ class TestDMXController:
         channels1 = [Channel(1, "Dimmer", ChannelType.DIMMER)]
         channels2 = [Channel(1, "Dimmer", ChannelType.DIMMER)]
         fixture1 = Fixture("PAR Can 1", FixtureType.PAR_CAN, 1, channels1)
-        fixture2 = Fixture("PAR Can 2", FixtureType.PAR_CAN,
-                           1, channels2)  # Mesmo endereço
+        fixture2 = Fixture(
+            "PAR Can 2", FixtureType.PAR_CAN, 1, channels2
+        )  # Mesmo endereço
         controller.add_fixture(fixture1)
         success = controller.add_fixture(fixture2)
         assert success is False
@@ -83,8 +84,7 @@ class TestDMXController:
     def test_set_universe_value_invalid_address(self):
         """Testa definir valor em endereço inválido."""
         controller = DMXController()
-        success = controller.set_universe_value(
-            0, 128)  # Endereço 0 é inválido
+        success = controller.set_universe_value(0, 128)  # Endereço 0 é inválido
         assert success is False
         success = controller.set_universe_value(513, 128)  # Endereço > 512
         assert success is False
@@ -150,9 +150,9 @@ class TestDMXController:
         universe = controller.get_universe()
         assert len(universe) == 512
         assert universe[0] == 128  # Canal 1
-        assert universe[1] == 64   # Canal 2
+        assert universe[1] == 64  # Canal 2
 
-    @patch('controller_dmx512.core.dmx_controller.DMXProtocol')
+    @patch("controller_dmx512.core.dmx_controller.DMXProtocol")
     def test_connect_success(self, mock_protocol_class):
         """Testa conexão bem-sucedida."""
         mock_protocol = Mock()
@@ -166,7 +166,7 @@ class TestDMXController:
         mock_protocol_class.assert_called_once()
         mock_protocol.connect.assert_called_once()
 
-    @patch('controller_dmx512.core.dmx_controller.DMXProtocol')
+    @patch("controller_dmx512.core.dmx_controller.DMXProtocol")
     def test_connect_failure(self, mock_protocol_class):
         """Testa falha na conexão."""
         mock_protocol = Mock()
@@ -178,7 +178,7 @@ class TestDMXController:
 
         assert success is False
 
-    @patch('controller_dmx512.core.dmx_controller.DMXProtocol')
+    @patch("controller_dmx512.core.dmx_controller.DMXProtocol")
     def test_disconnect(self, mock_protocol_class):
         """Testa desconexão."""
         mock_protocol = Mock()

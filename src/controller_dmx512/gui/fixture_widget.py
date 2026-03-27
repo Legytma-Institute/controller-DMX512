@@ -109,7 +109,9 @@ class FixtureWidget(ttk.Frame):
         self._add_btn_frame = ttk.Frame(self.scrollable_frame)
         self._add_btn_frame.pack(fill=tk.X, padx=5, pady=(5, 10))
         ttk.Button(
-            self._add_btn_frame, text="+ Adicionar Canal", command=self._add_channel_dialog,
+            self._add_btn_frame,
+            text="+ Adicionar Canal",
+            command=self._add_channel_dialog,
         ).pack(anchor=tk.W)
 
     def _create_single_channel_widget(self, index: int, channel):
@@ -122,7 +124,10 @@ class FixtureWidget(ttk.Frame):
         title_bar.pack(fill=tk.X, padx=5, pady=(2, 0))
 
         pencil_btn = tk.Label(
-            title_bar, text="\u270E", font=("Arial", 11), cursor="hand2",
+            title_bar,
+            text="\u270e",
+            font=("Arial", 11),
+            cursor="hand2",
         )
         pencil_btn.pack(side=tk.LEFT)
         pencil_btn.bind(
@@ -139,8 +144,11 @@ class FixtureWidget(ttk.Frame):
 
         # Botão remover (×)
         remove_btn = tk.Label(
-            title_bar, text="\u00D7", font=("Arial", 13, "bold"),
-            cursor="hand2", fg="red",
+            title_bar,
+            text="\u00d7",
+            font=("Arial", 13, "bold"),
+            cursor="hand2",
+            fg="red",
         )
         remove_btn.pack(side=tk.RIGHT)
         remove_btn.bind(
@@ -196,7 +204,9 @@ class FixtureWidget(ttk.Frame):
         ttk.Label(dialog, text="Tipo:").pack(pady=(5, 2))
         types = [ct.value for ct in ChannelType]
         type_var = tk.StringVar(value="dimmer")
-        type_combo = ttk.Combobox(dialog, textvariable=type_var, values=types, state="readonly", width=22)
+        type_combo = ttk.Combobox(
+            dialog, textvariable=type_var, values=types, state="readonly", width=22
+        )
         type_combo.pack()
 
         def do_add(event=None):
@@ -210,8 +220,12 @@ class FixtureWidget(ttk.Frame):
 
         btns = ttk.Frame(dialog)
         btns.pack(pady=8)
-        ttk.Button(btns, text="Adicionar", width=10, command=do_add).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btns, text="Cancelar", width=10, command=dialog.destroy).pack(side=tk.LEFT)
+        ttk.Button(btns, text="Adicionar", width=10, command=do_add).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Button(btns, text="Cancelar", width=10, command=dialog.destroy).pack(
+            side=tk.LEFT
+        )
         name_entry.select_range(0, tk.END)
         name_entry.focus_set()
         name_entry.bind("<Return>", do_add)
@@ -279,8 +293,12 @@ class FixtureWidget(ttk.Frame):
 
         btns = ttk.Frame(dialog)
         btns.pack(pady=10)
-        ttk.Button(btns, text="OK", width=8, command=apply_rename).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btns, text="Cancelar", width=8, command=dialog.destroy).pack(side=tk.LEFT)
+        ttk.Button(btns, text="OK", width=8, command=apply_rename).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Button(btns, text="Cancelar", width=8, command=dialog.destroy).pack(
+            side=tk.LEFT
+        )
 
         entry.select_range(0, tk.END)
         entry.focus_set()

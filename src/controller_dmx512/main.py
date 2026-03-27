@@ -42,12 +42,12 @@ def setup_logging(level: str = "INFO", log_file: str = None):
         level=numeric_level,
         fmt=log_format,
         level_styles={
-            'debug': {'color': 'green'},
-            'info': {'color': 'cyan'},
-            'warning': {'color': 'yellow'},
-            'error': {'color': 'red'},
-            'critical': {'color': 'red', 'bold': True}
-        }
+            "debug": {"color": "green"},
+            "info": {"color": "cyan"},
+            "warning": {"color": "yellow"},
+            "error": {"color": "red"},
+            "critical": {"color": "red", "bold": True},
+        },
     )
 
     # Handler para arquivo (se especificado) - não será colorido
@@ -122,8 +122,7 @@ Exemplos de uso:
         help="Nível de logging (padrão: INFO)",
     )
 
-    parser.add_argument("--log-file", type=str,
-                        help="Arquivo para salvar logs")
+    parser.add_argument("--log-file", type=str, help="Arquivo para salvar logs")
 
     parser.add_argument(
         "--no-gui",
@@ -146,8 +145,7 @@ Exemplos de uso:
 
     # Fallback automático para modo console em ambientes sem DISPLAY
     if not args.no_gui and not os.environ.get("DISPLAY"):
-        logging.warning(
-            "DISPLAY não definido; alternando para modo console (--no-gui)")
+        logging.warning("DISPLAY não definido; alternando para modo console (--no-gui)")
         args.no_gui = True
 
     try:
@@ -273,8 +271,7 @@ def run_gui_mode(controller: DMXController, args):
 
 def print_console_help():
     """Imprime ajuda dos comandos do console"""
-    print(
-        """
+    print("""
 Comandos disponíveis:
   help                    - Mostra esta ajuda
   status                  - Mostra status do controlador
@@ -286,23 +283,20 @@ Comandos disponíveis:
   set <canal> <valor>     - Define valor de um canal (ex: set 1 255)
   set <fixture> <canal> <valor> - Define valor de canal de fixture (ex: set "PAR Can 1" 0 128)
   quit/exit               - Sai da aplicação
-"""
-    )
+""")
 
 
 def print_status(controller: DMXController):
     """Imprime status do controlador"""
     status = controller.get_status()
-    print(
-        f"""
+    print(f"""
 Status do Controlador:
   Conectado: {status['connected']}
   Porta: {status['port']}
   Fixtures: {status['fixture_count']}
   Executando: {status['running']}
   Canais ativos: {status['universe_used']}/512
-"""
-    )
+""")
 
 
 def print_fixtures(controller: DMXController):

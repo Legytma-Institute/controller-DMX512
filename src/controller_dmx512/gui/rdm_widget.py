@@ -76,7 +76,9 @@ class RDMWidget(ttk.Frame):
         self._tree.column("address", width=70, minwidth=50)
         self._tree.column("footprint", width=60, minwidth=40)
 
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self._tree.yview)
+        scrollbar = ttk.Scrollbar(
+            list_frame, orient=tk.VERTICAL, command=self._tree.yview
+        )
         self._tree.configure(yscrollcommand=scrollbar.set)
 
         self._tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -93,32 +95,44 @@ class RDMWidget(ttk.Frame):
         info_grid.pack(fill=tk.X, padx=5, pady=5)
 
         row = 0
-        ttk.Label(info_grid, text="UID:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="UID:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_uid = ttk.Label(info_grid, text="-")
         self._lbl_uid.grid(row=row, column=1, sticky=tk.W)
 
         row += 1
-        ttk.Label(info_grid, text="Fabricante:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="Fabricante:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_manufacturer = ttk.Label(info_grid, text="-")
         self._lbl_manufacturer.grid(row=row, column=1, sticky=tk.W)
 
         row += 1
-        ttk.Label(info_grid, text="Modelo:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="Modelo:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_model = ttk.Label(info_grid, text="-")
         self._lbl_model.grid(row=row, column=1, sticky=tk.W)
 
         row += 1
-        ttk.Label(info_grid, text="Firmware:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="Firmware:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_firmware = ttk.Label(info_grid, text="-")
         self._lbl_firmware.grid(row=row, column=1, sticky=tk.W)
 
         row += 1
-        ttk.Label(info_grid, text="Personalidade:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="Personalidade:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_personality = ttk.Label(info_grid, text="-")
         self._lbl_personality.grid(row=row, column=1, sticky=tk.W)
 
         row += 1
-        ttk.Label(info_grid, text="Sensores:").grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(info_grid, text="Sensores:").grid(
+            row=row, column=0, sticky=tk.W, padx=(0, 5)
+        )
         self._lbl_sensors = ttk.Label(info_grid, text="-")
         self._lbl_sensors.grid(row=row, column=1, sticky=tk.W)
 
@@ -179,7 +193,9 @@ class RDMWidget(ttk.Frame):
         if self._discovery_running:
             return
         if not self.controller.protocol or not self.controller.protocol.is_connected:
-            messagebox.showwarning("Aviso", "Conecte ao dispositivo DMX antes de executar discovery.")
+            messagebox.showwarning(
+                "Aviso", "Conecte ao dispositivo DMX antes de executar discovery."
+            )
             return
 
         self._discovery_running = True
@@ -193,7 +209,9 @@ class RDMWidget(ttk.Frame):
                 self.after(0, self._populate_tree)
             except Exception as e:
                 logger.error("Erro no RDM discovery: %s", e)
-                self.after(0, lambda: messagebox.showerror("Erro", f"Falha no discovery: {e}"))
+                self.after(
+                    0, lambda: messagebox.showerror("Erro", f"Falha no discovery: {e}")
+                )
             finally:
                 self._discovery_running = False
                 self.after(0, lambda: self._btn_discover.config(state=tk.NORMAL))
@@ -281,13 +299,20 @@ class RDMWidget(ttk.Frame):
         def _run():
             ok = self.controller.rdm_set_dmx_address(uid, address)
             if ok:
-                self.after(0, lambda: self._lbl_status.config(text=f"Endereço alterado para {address}"))
+                self.after(
+                    0,
+                    lambda: self._lbl_status.config(
+                        text=f"Endereço alterado para {address}"
+                    ),
+                )
                 info = self.controller.rdm_get_full_device_info(uid)
                 if info:
                     self.after(0, lambda: self._show_detail(info))
                     self.after(0, self._populate_tree)
             else:
-                self.after(0, lambda: messagebox.showerror("Erro", "Falha ao alterar endereço"))
+                self.after(
+                    0, lambda: messagebox.showerror("Erro", "Falha ao alterar endereço")
+                )
 
         threading.Thread(target=_run, daemon=True).start()
 
@@ -306,13 +331,23 @@ class RDMWidget(ttk.Frame):
         def _run():
             ok = self.controller.rdm_set_device_label(uid, label)
             if ok:
-                self.after(0, lambda: self._lbl_status.config(text=f"Nome alterado para '{label}'"))
+                self.after(
+                    0,
+                    lambda: self._lbl_status.config(
+                        text=f"Nome alterado para '{label}'"
+                    ),
+                )
                 info = self.controller.rdm_get_full_device_info(uid)
                 if info:
                     self.after(0, lambda: self._show_detail(info))
                     self.after(0, self._populate_tree)
             else:
-                self.after(0, lambda: messagebox.showerror("Erro", "Falha ao renomear dispositivo"))
+                self.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Erro", "Falha ao renomear dispositivo"
+                    ),
+                )
 
         threading.Thread(target=_run, daemon=True).start()
 

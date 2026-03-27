@@ -23,8 +23,7 @@ class TestChannel:
 
     def test_channel_with_custom_range(self):
         """Testa a criação de um canal com range personalizado."""
-        channel = Channel(2, "Pan", ChannelType.PAN,
-                          min_value=0, max_value=255)
+        channel = Channel(2, "Pan", ChannelType.PAN, min_value=0, max_value=255)
         assert channel.number == 2
         assert channel.min_value == 0
         assert channel.max_value == 255
@@ -49,8 +48,7 @@ class TestChannel:
 
     def test_set_value_with_custom_range(self):
         """Testa definir valor com range personalizado."""
-        channel = Channel(1, "Pan", ChannelType.PAN,
-                          min_value=0, max_value=255)
+        channel = Channel(1, "Pan", ChannelType.PAN, min_value=0, max_value=255)
         channel.set_value(128)
         assert channel.current_value == 128
         # Valor fora do range

@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-
 RDM_START_CODE = 0xCC
 RDM_SUB_START_CODE = 0x01
 
@@ -202,8 +201,14 @@ def parse_rdm_message(packet: bytes) -> RDMMessage:
     if not rdm_verify_checksum(packet):
         raise ValueError("checksum mismatch")
 
-    dest = RDMUID(packet[3] << 8 | packet[4], (packet[5] << 24) | (packet[6] << 16) | (packet[7] << 8) | packet[8])
-    src = RDMUID(packet[9] << 8 | packet[10], (packet[11] << 24) | (packet[12] << 16) | (packet[13] << 8) | packet[14])
+    dest = RDMUID(
+        packet[3] << 8 | packet[4],
+        (packet[5] << 24) | (packet[6] << 16) | (packet[7] << 8) | packet[8],
+    )
+    src = RDMUID(
+        packet[9] << 8 | packet[10],
+        (packet[11] << 24) | (packet[12] << 16) | (packet[13] << 8) | packet[14],
+    )
     tn = packet[15]
     port_id_or_resp_type = packet[16]
     msg_count = packet[17]
@@ -257,7 +262,13 @@ def decode_discovery_response(raw: bytes) -> Tuple[DiscoveryResult, Optional[RDM
     if expected != actual:
         return (DiscoveryResult.COLLISION, None)
 
-    uid = RDMUID(uid_bytes[0] << 8 | uid_bytes[1], (uid_bytes[2] << 24) | (uid_bytes[3] << 16) | (uid_bytes[4] << 8) | uid_bytes[5])
+    uid = RDMUID(
+        uid_bytes[0] << 8 | uid_bytes[1],
+        (uid_bytes[2] << 24)
+        | (uid_bytes[3] << 16)
+        | (uid_bytes[4] << 8)
+        | uid_bytes[5],
+    )
     return (DiscoveryResult.VALID, uid)
 
 

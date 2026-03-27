@@ -217,7 +217,9 @@ class DMXProtocol:
                     continue
                 if b[0] != self.RDM_START_CODE:
                     continue
-                rest = self._read_exact(2, timeout_s=max(0.0, deadline - time.monotonic()))
+                rest = self._read_exact(
+                    2, timeout_s=max(0.0, deadline - time.monotonic())
+                )
                 if not rest:
                     return None
                 msg_len = rest[1]

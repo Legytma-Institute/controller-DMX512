@@ -98,8 +98,8 @@ class TestFixture:
         dmx_data = fixture.get_all_values()
         assert len(dmx_data) == 3
         assert dmx_data[0] == 128  # Dimmer
-        assert dmx_data[1] == 64   # Red
-        assert dmx_data[2] == 32   # Green
+        assert dmx_data[1] == 64  # Red
+        assert dmx_data[2] == 32  # Green
 
     def test_str_representation(self):
         """Testa a representação string do fixture."""

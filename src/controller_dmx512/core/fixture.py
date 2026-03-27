@@ -272,8 +272,7 @@ class Fixture:
             "model": metadata.get("model", ""),
             "type": self.fixture_type.value,
             "channels": [
-                {"name": ch.name, "type": ch.channel_type.value}
-                for ch in self.channels
+                {"name": ch.name, "type": ch.channel_type.value} for ch in self.channels
             ],
         }
 
@@ -311,7 +310,9 @@ class Fixture:
         return fixture
 
     @classmethod
-    def from_config(cls, config_path: Union[str, Path], name: str, start_address: int) -> "Fixture":
+    def from_config(
+        cls, config_path: Union[str, Path], name: str, start_address: int
+    ) -> "Fixture":
         """Cria um fixture a partir de um arquivo de configuração (template)
 
         Args:
@@ -435,7 +436,9 @@ class PredefinedFixtures:
         return fixture
 
     @staticmethod
-    def create_generic(name: str, start_address: int, channel_count: int = 16) -> Fixture:
+    def create_generic(
+        name: str, start_address: int, channel_count: int = 16
+    ) -> Fixture:
         """Cria uma fixture genérica com N canais (padrão 16) para testes"""
         fixture = Fixture(name, FixtureType.CUSTOM, start_address)
 
