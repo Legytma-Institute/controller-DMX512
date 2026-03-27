@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../misc/check_provisioner_exists.sh"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stdout/info.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/info.sh"
 
 #
 # Remove a provisioner

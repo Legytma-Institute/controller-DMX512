@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../setup/installation/install_docker.sh"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stderr/error.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/error.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../misc/generate_node_config.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../infrastructure/docker/run_and_check_services.sh"
 

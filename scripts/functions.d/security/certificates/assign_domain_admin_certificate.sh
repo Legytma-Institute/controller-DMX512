@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stderr/error.sh"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stdout/info.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/error.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/info.sh"
 
 #
 # Assign admin certificate to the domain msp

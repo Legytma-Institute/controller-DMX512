@@ -3,7 +3,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../configuration/format/get_value_from_json_or_yaml.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/generate_certificate_authority_item_for_ccp_file.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/generate_channel_item_for_ccp_file.sh"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stdout/debug.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/debug.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/generate_organization_item_for_ccp_file.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../configuration/environment/get_environment_variable_from_docker_compose_file.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/generate_matcher_item_for_ccp_file.sh"

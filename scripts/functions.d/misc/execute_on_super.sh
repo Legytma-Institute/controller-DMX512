@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../logging/stderr/error.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../shell/logging/error.sh"
 
 #
 # Execute on super devcontainer

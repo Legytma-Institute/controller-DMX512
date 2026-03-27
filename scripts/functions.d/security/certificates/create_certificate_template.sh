@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../logging/stdout/info.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/info.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../files/generate/create_data_file.sh"
 
 #

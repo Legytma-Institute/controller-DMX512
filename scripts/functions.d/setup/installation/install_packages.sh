@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../blockchain/fabric/generate_msp_config.sh"
+# source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../blockchain/fabric/generate_msp_config.sh"
 
 # #
 # # Generate a msp config file

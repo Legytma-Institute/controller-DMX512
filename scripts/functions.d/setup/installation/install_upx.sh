@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../network/http/get_latest_version.sh"
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../logging/stdout/debug.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../network/http/get_latest_version.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../shell/logging/debug.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install_latest_version.sh"
 
 #

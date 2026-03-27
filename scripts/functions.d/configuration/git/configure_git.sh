@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../configuration/git/configure_safe_directories.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/configure_safe_directories.sh"
 
 #
 # Configure GIT

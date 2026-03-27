@@ -1,259 +1,269 @@
 #!/usr/bin/env bash
+#
+# this.sh - Script entrypoint dispatcher.
+#
+# Dispatches to sub-command scripts in this.d/ with lifecycle hooks.
+# Supports three invocation modes:
+#   - Single-dash first arg (-h, -help): this.sh's own flags
+#   - Positional (bare word):            single sub-command dispatch
+#   - Dashed-flag (--name):              multi sub-command dispatch
+#
+# Lifecycle order:
+#   1. Source functions.sh        (mandatory)
+#   2. Source hooks/pre-execute.sh (optional)
+#   3. Dispatch sub-command(s)
+#   4. Source hooks/post-execute.sh (optional)
+#
 
-set -e
+set -euo pipefail
+
+# --- Self-location (works when sourced or executed) ---
+_THIS_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- Logging helpers ---
+_this_log_prefix="[this.sh]"
+
+# shellcheck disable=SC2317
+_this_info()  { info "${_this_log_prefix} $*"; }
+_this_warn()  { warn "${_this_log_prefix} WARN: $*"; }
+_this_error() { error "${_this_log_prefix} ERROR: $*"; }
 
 if [ -t 0 ] && [ -t 1 ]; then
     clear
-fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# shellcheck source=./functions.sh
-source "${SCRIPT_DIR}"/functions.sh
-
-#
-# Load .env file
-#
-load_env_file
-
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="${VENV_DIR:-${CURRENT_DIR}/.venv}"
-VENV_PY="${VENV_DIR}/bin/python"
-
-ensure_venv() {
-    if [ ! -d "${VENV_DIR}" ]; then
-        "${PYTHON_BIN}" -m venv "${VENV_DIR}"
-    fi
-
-    "${VENV_PY}" -m pip install -U pip setuptools wheel
-}
-
-ensure_dev_dependencies() {
-    ensure_venv
-
-    if [ -f "${CURRENT_DIR}/pyproject.toml" ]; then
-        "${VENV_PY}" -m pip install -e ".[dev]"
-    elif [ -f "${CURRENT_DIR}/requirements.txt" ]; then
-        "${VENV_PY}" -m pip install -r "${CURRENT_DIR}/requirements.txt"
-    fi
-}
-
-# Parse arguments
-SPECIFY_ARGUMENTS=()
-TEST_ARGUMENTS=()
-LINT_ARGUMENTS=()
-BUILD_ARGUMENTS=()
-RUN_ARGUMENTS=()
-UNSPECIFIED_ARGUMENTS=()
-ARGUMENT_CONTEXT="unspecified"
-HELP=false
-SPECIFY=false
-TEST=false
-LINT=false
-BUILD=false
-RUN=false
-DEBUG=false
-
-if [ $# -eq 0 ]; then
-    HELP=true
-fi
-
-# Function to handle argument based on context
-handle_argument() {
-    local ARGUMENT
-
-    ARGUMENT="$1"
-
-    case "${ARGUMENT_CONTEXT}" in
-        specify)
-            SPECIFY_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-        test)
-            TEST_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-        lint)
-            LINT_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-        build)
-            BUILD_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-        run)
-            RUN_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-        *)
-            HELP=true
-            UNSPECIFIED_ARGUMENTS+=("${ARGUMENT}")
-            ;;
-    esac
-}
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --)
-            shift 1
-            while [[ $# -gt 0 ]]; do
-                handle_argument "$1"
-                shift 1
-            done
-            ;;
-        --help)
-            HELP=true
-            shift 1
-            ;;
-        --specify)
-            SPECIFY=true
-            ARGUMENT_CONTEXT="specify"
-            shift 1
-            ;;
-        --build)
-            BUILD=true
-            ARGUMENT_CONTEXT="build"
-            shift 1
-            ;;
-        --lint)
-            LINT=true
-            ARGUMENT_CONTEXT="lint"
-            shift 1
-            ;;
-        --test)
-            TEST=true
-            ARGUMENT_CONTEXT="test"
-            shift 1
-            ;;
-        --run)
-            RUN=true
-            ARGUMENT_CONTEXT="run"
-            shift 1
-            ;;
-        --debug)
-            DEBUG=true
-            RUN=true
-            ARGUMENT_CONTEXT="run"
-            shift 1
-            ;;
-        *)
-            handle_argument "$1"
-            shift 1
-            ;;
-    esac
-done
-
-if [ "${HELP}" == "true" ]; then
-    if [ ${#UNSPECIFIED_ARGUMENTS[@]} -gt 0 ]; then
-        echo -e "\033[31mInvalid arguments at this context: \033[33m${UNSPECIFIED_ARGUMENTS[*]}\033[0m" >&2
-        echo "" >&2
-    fi
-
-    echo -e "Usage: \033[32mthis \033[33m[options]\033[0m"
     echo ""
-    echo "Options:"
-    echo -e "  \033[33m--help \033[34m\033[0m                 Show this help message"
-    echo -e "  \033[33m--specify \033[34m[arguments]\033[0m   Initialize a new spec-kit repository passing arguments to the specify command"
-    echo -e "  \033[33m--lint \033[34m[arguments]\033[0m      Run Python lint/format/typecheck (black/flake8/mypy)"
-    echo -e "  \033[33m--test \033[34m[arguments]\033[0m      Run Python tests (pytest)"
-    echo -e "  \033[33m--build \033[34m[arguments]\033[0m     Build the Python package (python -m build)"
-    echo -e "  \033[33m--run \033[34m[arguments]\033[0m       Run the application (dmx-controller)"
-    echo ""
-
-    if [ ${#UNSPECIFIED_ARGUMENTS[@]} -gt 0 ]; then
-        exit 1
-    else
-        exit 0
-    fi
 fi
 
-if [ "${SPECIFY}" == "true" ]; then
-    echo -e "\033[33mRunning specify...\033[0m" >&2
+# ---------------------------------------------------------------------------
+# FR-001: Source functions.sh (mandatory — fail fast if missing)
+# ---------------------------------------------------------------------------
+_THIS_FUNCTIONS_SH="${_THIS_SELF_DIR}/functions.sh"
+# # Prefer offline update skip for CLI responsiveness; allow caller override
+# : "${FUNCTIONS_DISABLE_UPDATE:=1}"
+if [[ ! -f "$_THIS_FUNCTIONS_SH" ]]; then
+  _this_error "Required file missing: ${_THIS_FUNCTIONS_SH}"
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$_THIS_FUNCTIONS_SH"
 
-    if run_specify "${SPECIFY_ARGUMENTS[@]}"; then
-        echo -e "\033[32mSpecify succeeded\033[0m" >&2
+if [ -t 0 ] && [ -t 1 ]; then
+  if command -v print_prompt &> /dev/null && [[ "$(command -v print_prompt)" == "print_prompt" ]]; then
+    if [ "$0" == "${_THIS_SELF_DIR}/this.sh" ] && [ "$(command -v $(basename "$0" .sh))" == "$(basename "$0" .sh)" ]; then
+      # Get the current command name without the extension
+      _CURRENT_COMMAND=$(basename "$0" .sh)
     else
-        echo -e "\033[31mSpecify failed\033[0m" >&2
-        exit 2
+      _CURRENT_COMMAND="$0"
     fi
+
+    tput sc
+    tput cup 0 0
+
+    print_prompt "${_CURRENT_COMMAND} $*"
+
+    tput rc
+  fi
 fi
 
-if [ "${LINT}" == "true" ]; then
-    echo -e "\033[33mRunning lint...\033[0m" >&2
+# ---------------------------------------------------------------------------
+# FR-014: Hook sourcing helper — warn-and-skip on failure
+# ---------------------------------------------------------------------------
+_this_source_hook() {
+  local hook_path="$1"
+  if [[ ! -f "$hook_path" ]]; then
+    return 0
+  fi
+  if [[ ! -r "$hook_path" ]]; then
+    _this_warn "Hook not readable, skipping: ${hook_path}"
+    return 0
+  fi
+  # shellcheck source=/dev/null
+  if ! source "$hook_path"; then
+    _this_warn "Hook failed to source, skipping: ${hook_path}"
+    return 0
+  fi
+}
 
-    ensure_dev_dependencies
+_THIS_HOOKS_DIR="${_THIS_SELF_DIR}/hooks"
+_THIS_COMMANDS_DIR="${_THIS_SELF_DIR}/this.d"
 
-    if [ ${#LINT_ARGUMENTS[@]} -gt 0 ]; then
-        "${VENV_PY}" -m black "${LINT_ARGUMENTS[@]}"
-        "${VENV_PY}" -m flake8 "${LINT_ARGUMENTS[@]}"
-        "${VENV_PY}" -m mypy "${LINT_ARGUMENTS[@]}"
+# ---------------------------------------------------------------------------
+# FR-003: Source hooks/pre-execute.sh before dispatch
+# ---------------------------------------------------------------------------
+_this_source_hook "${_THIS_HOOKS_DIR}/pre-execute.sh"
+
+# ---------------------------------------------------------------------------
+# FR-018: Single-dash first arg = this.sh's own flags (only when $1)
+# FR-005/FR-012: _this_show_help defined later; called by -h/-help and no-args
+# ---------------------------------------------------------------------------
+_this_get_description() {
+  local script="$1"
+  grep -m1 '^# @description ' "$script" 2>/dev/null | sed 's/^# @description //' || echo ""
+}
+
+_this_show_help() {
+  echo "This is a command runner for bash-lib"
+  echo ""
+  echo "Usage: this.sh <command> [args...]"
+  echo "       this.sh --command1 [--command2 ...] [-- args...]"
+  echo "       this.sh -h"
+  echo ""
+
+  if [[ ! -d "$_THIS_COMMANDS_DIR" ]]; then
+    echo "No commands directory found."
+    return 0
+  fi
+
+  local scripts
+  scripts="$(find "$_THIS_COMMANDS_DIR" -maxdepth 1 -type f -name '*.sh' 2>/dev/null | sort)"
+
+  if [[ -z "$scripts" ]]; then
+    echo "No commands available."
+    return 0
+  fi
+
+  echo "Available commands:"
+
+  local max_len=0 name
+  while IFS= read -r script; do
+    name="$(basename "$script" .sh)"
+    [[ "$name" == _* ]] && continue
+    [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]] && continue
+    if [[ ${#name} -gt $max_len ]]; then
+      max_len=${#name}
+    fi
+  done <<< "$scripts"
+
+  local desc
+  while IFS= read -r script; do
+    name="$(basename "$script" .sh)"
+    [[ "$name" == _* ]] && continue
+    [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]] && continue
+    desc="$(_this_get_description "$script")"
+    printf "  %-${max_len}s  %s\n" "$name" "$desc"
+  done <<< "$scripts"
+}
+
+_this_exit_code=0
+
+if [[ $# -eq 0 ]]; then
+  # FR-005: No arguments — source on-no-arguments hook if present, else show help
+  _this_on_no_args_hook="${_THIS_HOOKS_DIR}/on-no-arguments.sh"
+  if [[ -f "$_this_on_no_args_hook" ]]; then
+    _this_source_hook "$_this_on_no_args_hook"
+  else
+    _this_show_help
+  fi
+elif [[ "$1" == -* && "$1" != --* ]]; then
+  # Single-dash first arg — this.sh's own flag
+  case "$1" in
+    -h|-help)
+      _this_show_help
+      exit 0
+      ;;
+    *)
+      _this_error "Unknown flag: $1. Use -h for help."
+      exit 1
+      ;;
+  esac
+elif [[ "$1" != --* ]]; then
+  # ---------------------------------------------------------------------------
+  # Positional mode — single sub-command (FR-006)
+  # ---------------------------------------------------------------------------
+  _this_cmd_name="$1"
+  shift
+
+  if [[ ! -d "$_THIS_COMMANDS_DIR" ]]; then
+    _this_error "Commands directory not found: ${_THIS_COMMANDS_DIR}"
+    _this_exit_code=1
+  elif [[ ! "$_this_cmd_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    _this_error "Invalid command name: ${_this_cmd_name}"
+    _this_exit_code=1
+  else
+    _this_script="${_THIS_COMMANDS_DIR}/${_this_cmd_name}.sh"
+    if [[ ! -f "$_this_script" ]]; then
+      _this_error "Unknown command: ${_this_cmd_name} (${_this_script} not found)"
+      _this_exit_code=1
     else
-        "${VENV_PY}" -m black .
-        "${VENV_PY}" -m flake8 .
-        "${VENV_PY}" -m mypy src
+      bash "$_this_script" "$@" || _this_exit_code=$?
     fi
+  fi
+else
+  # ---------------------------------------------------------------------------
+  # Dashed-flag mode — multi sub-command (FR-007, FR-008, FR-016, FR-017, FR-018)
+  # ---------------------------------------------------------------------------
+  if [[ ! -d "$_THIS_COMMANDS_DIR" ]]; then
+    _this_error "Commands directory not found: ${_THIS_COMMANDS_DIR}"
+    _this_exit_code=1
+  else
+    # Accumulated commands: parallel arrays for scripts and their args
+    _this_cmd_scripts=()
+    _this_cmd_args=()
+    _this_active_idx=-1
 
-    if [ $? -eq 0 ]; then
-        echo -e "\033[32mLint succeeded!\033[0m" >&2
-    else
-        echo -e "\033[31mLint failed!\033[0m" >&2
-        exit 4
-    fi
-fi
+    while [[ $# -gt 0 ]]; do
+      _this_arg="$1"
+      shift
 
-if [ "${BUILD}" == "true" ]; then
-    echo -e "\033[33mRunning build...\033[0m" >&2
-
-    ensure_dev_dependencies
-
-    if ! "${VENV_PY}" -c "import build" > /dev/null 2>&1; then
-        "${VENV_PY}" -m pip install -U build
-    fi
-
-    if "${VENV_PY}" -m build "${BUILD_ARGUMENTS[@]}"; then
-        echo -e "\033[32mBuild succeeded\033[0m" >&2
-    else
-        echo -e "\033[31mBuild failed\033[0m" >&2
-        exit 3
-    fi
-fi
-
-if [ "${TEST}" == "true" ]; then
-    echo -e "\033[33mRunning test...\033[0m" >&2
-
-    ensure_dev_dependencies
-
-    if "${VENV_PY}" -m pytest "${TEST_ARGUMENTS[@]}"; then
-        echo -e "\033[32mTest succeeded!\033[0m" >&2
-    else
-        echo -e "\033[31mTest failed!\033[0m" >&2
-        exit 5
-    fi
-fi
-
-if [ "${RUN}" == "true" ]; then
-    echo -e "\033[33mRunning app...\033[0m" >&2
-
-    if [ "${DEBUG}" == "true" ]; then
-        if "${VENV_PY}" -m controller_dmx512.main "${RUN_ARGUMENTS[@]}"; then
-            echo -e "\033[32mRun succeeded!\033[0m" >&2
-            exit 0
-        else
-            echo -e "\033[31mRun failed!\033[0m" >&2
-            exit 6
+      if [[ "$_this_arg" == "--" ]]; then
+        # FR-009: Double-dash passthrough — all remaining to last active
+        if [[ $_this_active_idx -lt 0 ]]; then
+          _this_error "No command before '--'. Nothing to receive arguments."
+          _this_exit_code=1
+          break
         fi
-    fi
+        # Append all remaining args to last active command
+        while [[ $# -gt 0 ]]; do
+          _this_cmd_args[_this_active_idx]+=" $(printf '%q' "$1")"
+          shift
+        done
+        break
+      elif [[ "$_this_arg" == --* ]]; then
+        # Double-dash arg: check if it maps to a sub-command
+        _this_flag_name="${_this_arg#--}"
+        _this_candidate="${_THIS_COMMANDS_DIR}/${_this_flag_name}.sh"
 
-    ensure_dev_dependencies
+        if [[ "$_this_flag_name" =~ ^[a-zA-Z0-9_-]+$ ]] && [[ -f "$_this_candidate" ]]; then
+          # New active sub-command
+          _this_active_idx=$(( ${#_this_cmd_scripts[@]} ))
+          _this_cmd_scripts+=("$_this_candidate")
+          _this_cmd_args+=("")
+        elif [[ $_this_active_idx -lt 0 ]]; then
+          # No active command yet — error
+          _this_error "No matching command for '${_this_arg}' and no prior command to receive it."
+          _this_exit_code=1
+          break
+        else
+          # Unrecognised flag — append to active command's args
+          _this_cmd_args[_this_active_idx]+=" $(printf '%q' "$_this_arg")"
+        fi
+      else
+        # Single-dash or bare word after first arg — append to active command
+        if [[ $_this_active_idx -lt 0 ]]; then
+          _this_error "No matching command for '${_this_arg}' and no prior command to receive it."
+          _this_exit_code=1
+          break
+        fi
+        _this_cmd_args[_this_active_idx]+=" $(printf '%q' "$_this_arg")"
+      fi
+    done
 
-    if [ -x "${VENV_DIR}/bin/dmx-controller" ]; then
-        if "${VENV_DIR}/bin/dmx-controller" "${RUN_ARGUMENTS[@]}"; then
-            echo -e "\033[32mRun succeeded!\033[0m" >&2
-        else
-            echo -e "\033[31mRun failed!\033[0m" >&2
-            exit 6
-        fi
-    else
-        if "${VENV_PY}" -m controller_dmx512.main "${RUN_ARGUMENTS[@]}"; then
-            echo -e "\033[32mRun succeeded!\033[0m" >&2
-        else
-            echo -e "\033[31mRun failed!\033[0m" >&2
-            exit 6
-        fi
+    # Execute accumulated commands sequentially (FR-007, FR-016)
+    if [[ $_this_exit_code -eq 0 ]]; then
+      for _this_i in "${!_this_cmd_scripts[@]}"; do
+        _this_run_script="${_this_cmd_scripts[$_this_i]}"
+        _this_run_args="${_this_cmd_args[$_this_i]}"
+        eval "bash \"$_this_run_script\" $_this_run_args" || {
+          _this_exit_code=$?
+          break
+        }
+      done
     fi
+  fi
 fi
+
+# ---------------------------------------------------------------------------
+# FR-004: Source hooks/post-execute.sh after dispatch (always runs)
+# ---------------------------------------------------------------------------
+_this_source_hook "${_THIS_HOOKS_DIR}/post-execute.sh"
+
+exit "${_this_exit_code}"
