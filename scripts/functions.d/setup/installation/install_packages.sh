@@ -38,7 +38,9 @@ function install_packages() {
     local COMMAND=$1
     shift 1
 
+    set +u
     local PACKAGES=$1
+    set -u
 
     if ! command -v $COMMAND &> /dev/null; then
         sudo apt update

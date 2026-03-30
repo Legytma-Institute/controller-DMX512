@@ -5,7 +5,9 @@ Este módulo implementa o protocolo DMX512 para comunicação
 com dispositivos de iluminação através de porta serial RS485.
 """
 
+import ctypes
 import logging
+import sys
 import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -14,6 +16,40 @@ import serial
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# High-resolution timer helpers
+# ---------------------------------------------------------------------------
+
+_windows_timer_set = False
+
+
+def _enable_windows_high_res_timer() -> None:
+    """Reduz a resolução do timer do Windows de ~15.6ms para ~1ms."""
+    global _windows_timer_set
+    if _windows_timer_set or sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.winmm.timeBeginPeriod(1)  # type: ignore[attr-defined]
+        _windows_timer_set = True
+        logger.debug("Windows high-resolution timer habilitado (1 ms)")
+    except Exception as exc:
+        logger.warning("Não foi possível habilitar timer de alta resolução: %s", exc)
+
+
+def _busy_wait_us(microseconds: float) -> None:
+    """Espera ocupada (busy-wait) com precisão de microsegundos.
+
+    ``time.sleep`` no Windows tem resolução de ~15.6 ms, totalmente
+    inadequada para os tempos do protocolo DMX512 (88-176 µs para o
+    break e 8-12 µs para o MAB).  Usamos ``time.perf_counter`` que
+    tem resolução sub-microsegundo em todas as plataformas.
+    """
+    if microseconds <= 0:
+        return
+    end = time.perf_counter() + microseconds / 1_000_000.0
+    while time.perf_counter() < end:
+        pass
+
 
 class DMXProtocolError(Exception):
     """Exceção para erros do protocolo DMX512"""
@@ -21,11 +57,19 @@ class DMXProtocolError(Exception):
     pass
 
 
+class DMXBreakMethod(Enum):
+    """Método utilizado para gerar o break DMX512"""
+
+    BAUD_SWITCH = "baud_switch"  # Troca de baud rate (recomendado para USB-serial)
+    BREAK_CONDITION = "break_condition"  # Usa break_condition do pyserial
+
+
 class DMXBreakLength(Enum):
     """Duração do break DMX em microssegundos"""
 
-    STANDARD = 88  # Padrão DMX512
-    LONG = 176  # Break longo para alguns dispositivos
+    MINIMUM = 88  # Mínimo absoluto DMX512/1990
+    STANDARD = 176  # Recomendado para compatibilidade
+    LONG = 300  # Break longo para dispositivos problemáticos
 
 
 class DMXProtocol:
@@ -43,7 +87,8 @@ class DMXProtocol:
         self,
         port: str,
         baudrate: int = 250000,
-        break_length: DMXBreakLength = DMXBreakLength.STANDARD,
+        break_length: DMXBreakLength = DMXBreakLength.LONG,
+        break_method: DMXBreakMethod = DMXBreakMethod.BAUD_SWITCH,
         rs485_direction: str = "none",
         rs485_tx_level: bool = True,
     ):
@@ -54,10 +99,13 @@ class DMXProtocol:
             port: Porta serial (ex: 'COM3', '/dev/ttyUSB0')
             baudrate: Taxa de transmissão (padrão DMX512: 250000)
             break_length: Duração do break em microssegundos
+            break_method: Método para gerar o break (BAUD_SWITCH é mais
+                          confiável com adaptadores USB-serial)
         """
         self.port = port
         self.baudrate = baudrate
         self.break_length = break_length
+        self.break_method = break_method
         self.rs485_direction = rs485_direction
         self.rs485_tx_level = rs485_tx_level
         self.serial_connection: Optional[serial.Serial] = None
@@ -66,9 +114,14 @@ class DMXProtocol:
         # Constantes do protocolo DMX512
         self.DMX_UNIVERSE_SIZE = 512
         self.START_CODE = 0x00
-        self.MARK_AFTER_BREAK = 8  # μs
+        self.MARK_AFTER_BREAK = 12  # μs (mínimo DMX512-A)
 
         self.RDM_START_CODE = 0xCC
+
+        # Baud rate baixo para gerar o break via técnica de troca de baud.
+        # 9 bits baixos (start + 8×zero) a este baud = break_length μs.
+        # Os 2 stop bits (altos) a este baud servem como Mark After Break.
+        self._break_baud = max(1200, int(9_000_000 / self.break_length.value))
 
     def connect(self) -> bool:
         """
@@ -86,6 +139,9 @@ class DMXProtocol:
                 stopbits=serial.STOPBITS_TWO,
                 timeout=1.0,
             )
+
+            # Habilita timer de alta resolução no Windows
+            _enable_windows_high_res_timer()
 
             # Configura a porta para suportar break
             self.serial_connection.break_condition = False
@@ -171,16 +227,52 @@ class DMXProtocol:
 
         self._set_rs485_mode(tx=True)
 
-        self.serial_connection.break_condition = True
-        time.sleep(self.break_length.value / 1000000.0)
+        # Garante que dados anteriores foram completamente enviados
+        self.serial_connection.flush()
 
-        self.serial_connection.break_condition = False
-        time.sleep(self.MARK_AFTER_BREAK / 1000000.0)
+        if self.break_method == DMXBreakMethod.BAUD_SWITCH:
+            self._send_break_baud_switch()
+        else:
+            self._send_break_condition()
 
+        # Start code + payload a 250 kbaud
         self.serial_connection.write(bytes([start_code & 0xFF]))
         if payload:
             self.serial_connection.write(payload)
         self.serial_connection.flush()
+
+    def _send_break_baud_switch(self) -> None:
+        """Gera break DMX via troca de baud rate.
+
+        Envia 0x00 em baud rate baixo calculado para que os 9 bits
+        baixos (start + 8 zeros) produzam um sinal baixo com a duração
+        desejada do break.  Os 2 stop bits (altos) servem como MAB.
+        O chip USB-serial controla o timing internamente, sem depender
+        da precisão de sleep/timers do sistema operacional.
+        """
+        assert self.serial_connection is not None
+
+        # Troca para baud rate baixo e envia 0x00
+        self.serial_connection.baudrate = self._break_baud
+        self.serial_connection.write(b"\x00")
+        # flush() garante que o byte foi completamente transmitido
+        self.serial_connection.flush()
+
+        # Restaura baud rate DMX512
+        self.serial_connection.baudrate = self.baudrate
+
+    def _send_break_condition(self) -> None:
+        """Gera break DMX via break_condition do pyserial.
+
+        Menos confiável em adaptadores USB-serial devido à latência USB.
+        """
+        assert self.serial_connection is not None
+
+        self.serial_connection.break_condition = True
+        _busy_wait_us(self.break_length.value)
+
+        self.serial_connection.break_condition = False
+        _busy_wait_us(self.MARK_AFTER_BREAK)
 
     def _read_exact(self, size: int, timeout_s: float) -> Optional[bytes]:
         if not self.serial_connection:

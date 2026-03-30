@@ -1,0 +1,11 @@
+{
+  "name": "Strobo Atomic 3000",
+  "manufacturer": "Atomic",
+  "brand": "Atomic",
+  "model": "ATOMIC-3000",
+  "type": "strobe",
+  "channels": [
+    {"name": "Strobo", "type": "strobe"},
+    {"name": "Power", "type": "dimmer"}
+  ]
+}

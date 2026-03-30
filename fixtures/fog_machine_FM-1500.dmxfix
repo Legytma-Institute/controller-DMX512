@@ -1,0 +1,10 @@
+{
+  "name": "Fog Machine FM-1500",
+  "manufacturer": "Pro Light",
+  "brand": "Pro Light UK Limited",
+  "model": "FM-1500",
+  "type": "fog",
+  "channels": [
+    {"name": "Fog", "type": "fog"}
+  ]
+}

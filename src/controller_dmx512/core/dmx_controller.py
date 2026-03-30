@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .channel import Channel, ChannelType
 from .fixture import Fixture, FixtureType, PredefinedFixtures
-from .protocol import DMXBreakLength, DMXProtocol
+from .protocol import DMXBreakLength, DMXBreakMethod, DMXProtocol
 from .rdm import (
     ALL_DEVICES_UID_INT,
     DiscoveryResult,
@@ -59,7 +59,8 @@ class DMXController:
         self,
         port: str = None,
         baudrate: int = 250000,
-        break_length: DMXBreakLength = DMXBreakLength.STANDARD,
+        break_length: DMXBreakLength = DMXBreakLength.LONG,
+        break_method: DMXBreakMethod = DMXBreakMethod.BAUD_SWITCH,
         rs485_direction: str = "none",
         rs485_tx_level: bool = True,
         rdm_controller_uid: str = "7fff:00000001",
@@ -75,6 +76,7 @@ class DMXController:
         self.port = port
         self.baudrate = baudrate
         self.break_length = break_length
+        self.break_method = break_method
         self.rs485_direction = rs485_direction
         self.rs485_tx_level = rs485_tx_level
 
@@ -133,6 +135,7 @@ class DMXController:
             self.port,
             self.baudrate,
             self.break_length,
+            break_method=self.break_method,
             rs485_direction=self.rs485_direction,
             rs485_tx_level=self.rs485_tx_level,
         )

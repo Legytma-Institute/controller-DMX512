@@ -478,7 +478,7 @@ _fn_source_functions() {
 
     local scripts
     # Ensure logging helpers are always available when using required-file whitelist
-    local scripts_requirements=("debug" "info" "warn" "error" "print_prompt" "${_fn_whitelist_entries[@]}")
+    local scripts_requirements=("debug" "info" "warning" "error" "print_prompt" "${_fn_whitelist_entries[@]}")
     scripts="$(find "${_FUNCTIONS_SELF_DIR}/this.d" -maxdepth 1 -type f -name '*.sh' 2>/dev/null | sort)"
 
     if [[ ! -z "$scripts" ]]; then

@@ -8,8 +8,14 @@ export PLATFORM=${OS}-${ARCH}
 # Current directory
 export CURRENT_DIR=$(pwd)
 
+# Functions directory
+export FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+
 # Script directory
-export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. > /dev/null 2>&1 && pwd)"
+export SCRIPT_DIR="$(cd "${FUNCTIONS_DIR}"/.. > /dev/null 2>&1 && pwd)"
+
+# This directory
+export THIS_DIR="${SCRIPT_DIR}/this.d"
 
 # Default base path
 export DEFAULT_BASE_PATH="${CURRENT_DIR}/.default"

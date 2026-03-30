@@ -144,7 +144,9 @@ Exemplos de uso:
     args = parser.parse_args()
 
     # Fallback automático para modo console em ambientes sem DISPLAY
-    if not args.no_gui and not os.environ.get("DISPLAY"):
+    if not args.no_gui and (sys.platform == "win32" or os.environ.get("DISPLAY")):
+        pass
+    elif not args.no_gui:
         logging.warning("DISPLAY não definido; alternando para modo console (--no-gui)")
         args.no_gui = True
 
